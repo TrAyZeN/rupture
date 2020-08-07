@@ -1,25 +1,25 @@
 use amethyst::{
     animation::VertexSkinningBundle,
     assets::{AssetStorage, Handle, Loader, ProgressCounter},
-    audio::{output::Output, AudioBundle, Mp3Format, Source, SourceHandle},
+    audio::{AudioBundle, Mp3Format, output::Output, Source, SourceHandle},
     controls::{ArcBallControlBundle, FlyControlTag, HideCursor},
     core::{math::Vector3, Transform, TransformBundle},
     ecs::{Entity, Read, World},
-    input::{is_key_down, is_mouse_button_down, InputBundle, StringBindings, VirtualKeyCode},
+    input::{InputBundle, is_key_down, is_mouse_button_down, StringBindings, VirtualKeyCode},
     prelude::*,
     renderer::{
+        Camera,
+        ImageFormat,
         light::{Light, PointLight},
         palette::rgb::Rgb,
-        plugins::{RenderShaded3D, RenderSkybox, RenderToWindow},
+        plugins::{RenderShaded3D, RenderSkybox, RenderToWindow}, RenderingBundle, SpriteRender, SpriteSheet, SpriteSheetFormat, Texture,
         types::DefaultBackend,
-        Camera, ImageFormat, RenderingBundle, SpriteRender, SpriteSheet, SpriteSheetFormat,
-        Texture,
     },
     ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiText, UiTransform},
     utils::{application_root_dir, auto_fov::AutoFovSystem},
     winit::MouseButton,
 };
-
+use amethyst::ui::UiImage;
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
 
 mod hide;
@@ -43,6 +43,7 @@ pub struct LoadingState {
     coming: Option<SourceHandle>,
     font: Option<FontHandle>,
     afit: Option<Handle<SpriteSheet>>,
+    bashar: Option<Handle<Texture>>,
 }
 
 impl LoadingState {
@@ -98,8 +99,13 @@ impl SimpleState for LoadingState {
             &mut self.progress_counter,
             &data.world.read_resource(),
         ));
-
         self.afit = Some(self.load_sprite_sheet(&data.world));
+        self.bashar = Some(loader.load(
+            "textures/bashar.jpeg",
+            ImageFormat::default(),
+            &mut self.progress_counter,
+            &data.world.read_resource(),
+        ));
     }
 
     fn update(&mut self, _data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
@@ -116,6 +122,9 @@ impl SimpleState for LoadingState {
                     sprite_sheet: self.afit.take().expect("iléou le afit.png"),
                     sprite_number: 0,
                 },
+                bashar: UiImage::Texture(self.bashar.take().expect("iléou bashar.jpeg")),
+                score: 0.0,
+                unlocked_computers: Vec::new(),
             }))
         } else {
             Trans::None
@@ -129,6 +138,9 @@ struct GameState {
     coming: SourceHandle,
     font: FontHandle,
     afit: SpriteRender,
+    bashar: UiImage,
+    score: f64, // test success rate
+    unlocked_computers: Vec<i32>,
 }
 
 #[derive(Default)]
@@ -144,9 +156,16 @@ pub struct Afit {
 }
 
 #[derive(Default)]
+pub struct Screamer {
+    bashar: Option<Entity>
+}
+
+#[derive(Default)]
 pub struct TimeToScreamer {
     at: f64,
     played: bool,
+    last_displayed: f64,
+    display: bool,
 }
 
 #[derive(Default)]
@@ -229,6 +248,26 @@ impl SimpleState for GameState {
         data.world.insert(Texts {
             hide: Some(hide),
             code: Some(code),
+        });
+
+        let bashar = data
+            .world
+            .create_entity()
+            .with(UiTransform::new(
+                "bashar".to_string(),
+                Anchor::TopLeft,
+                Anchor::TopLeft,
+                0.,
+                0.,
+                0.,
+                0.,
+                0.,
+            ))
+            .with(self.bashar.clone())
+            .build();
+
+        data.world.insert(Screamer {
+            bashar: Some(bashar),
         });
 
         initialize_camera(data.world);
@@ -347,6 +386,7 @@ fn main() -> amethyst::Result<()> {
             coming: None,
             font: None,
             afit: None,
+            bashar: None,
         },
         game_data,
     )?;
