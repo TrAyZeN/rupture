@@ -6,6 +6,7 @@ use amethyst::{
     ecs::{Read, System, SystemData, Write},
 };
 
+use crate::ui::Reading;
 use crate::{play, CodeFound, PlayerHidden, Sounds, TimeToScreamer, MAX_CODE};
 
 #[derive(Debug, SystemDesc)]
@@ -21,9 +22,17 @@ impl<'s> System<'s> for ScreamerSystem {
         Read<'s, CodeFound>,
         Write<'s, TimeToScreamer>,
         Read<'s, PlayerHidden>,
+        Read<'s, Reading>,
     );
 
-    fn run(&mut self, (time, storage, sound, output, found, mut since, hidden): Self::SystemData) {
+    fn run(
+        &mut self,
+        (time, storage, sound, output, found, mut since, hidden, reading): Self::SystemData,
+    ) {
+        if reading.0 {
+            return;
+        }
+
         if since.at == 0.0 {
             since.at = time.absolute_time_seconds() + 15.0 + rand::random::<f64>() * 10.0;
         }

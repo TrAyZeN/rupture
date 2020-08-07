@@ -9,6 +9,7 @@ use amethyst::{
     input::{get_input_axis_simple, InputHandler, StringBindings},
 };
 
+use crate::ui::Reading;
 use crate::{space::*, PlayerHidden};
 
 #[derive(Debug, SystemDesc)]
@@ -40,9 +41,14 @@ impl<'a> System<'a> for RuptureMovementSystem {
         Read<'a, InputHandler<StringBindings>>,
         ReadStorage<'a, FlyControlTag>,
         Write<'a, PlayerHidden>,
+        Read<'a, Reading>,
     );
 
-    fn run(&mut self, (time, mut transform, input, tag, mut hide): Self::SystemData) {
+    fn run(&mut self, (time, mut transform, input, tag, mut hide, reading): Self::SystemData) {
+        if reading.0 {
+            return;
+        }
+
         let x = get_input_axis_simple(&self.right_input_axis, &input);
         let z = get_input_axis_simple(&self.forward_input_axis, &input);
 

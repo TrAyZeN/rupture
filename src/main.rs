@@ -15,7 +15,7 @@ use amethyst::{
         Camera, ImageFormat, RenderingBundle, SpriteRender, SpriteSheet, SpriteSheetFormat,
         Texture,
     },
-    ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiText, UiTransform},
+    ui::{FontHandle, RenderUi, TtfFormat, UiBundle},
     utils::{application_root_dir, auto_fov::AutoFovSystem},
     winit::MouseButton,
 };
@@ -26,10 +26,12 @@ mod hide;
 mod movement;
 mod screamer;
 mod space;
+mod ui;
 
 use hide::HidingSystem;
 use movement::RuptureMovementSystem;
 use screamer::ScreamerSystem;
+use ui::{Reading, TextSystem};
 
 const MAX_CODE: u8 = 10;
 
@@ -129,12 +131,6 @@ struct GameState {
 }
 
 #[derive(Default)]
-pub struct Texts {
-    hide: Option<Entity>,
-    code: Option<Entity>,
-}
-
-#[derive(Default)]
 pub struct CodeFound(u8);
 
 #[derive(Default)]
@@ -163,69 +159,25 @@ impl SimpleState for GameState {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let mut transform = Transform::default();
         transform.set_scale(Vector3::new(2.0, 2.0, 2.0));
-        // Create the scene entity.
+
         data.world
             .create_entity()
-            // Use the scene handle as a component
             .with(self.scene.clone())
             .with(transform)
             .build();
 
         data.world.insert(CodeFound::default());
         data.world.insert(TimeToScreamer::default());
+        data.world.insert(Reading(true));
         data.world.insert(Sounds {
             screamer: Some(self.screamer.clone()),
             coming: Some(self.coming.clone()),
         });
 
-        let hide = data
-            .world
-            .create_entity()
-            .with(UiTransform::new(
-                "hide".to_string(),
-                Anchor::BottomRight,
-                Anchor::BottomRight,
-                -50.,
-                50.,
-                1.,
-                650.,
-                50.,
-            ))
-            .with(UiText::new(
-                self.font.clone(),
-                String::new(),
-                [1., 1., 1., 1.],
-                40.,
-            ))
-            .build();
-
-        let code = data
-            .world
-            .create_entity()
-            .with(UiTransform::new(
-                "code".to_string(),
-                Anchor::TopLeft,
-                Anchor::TopLeft,
-                10.,
-                -50.,
-                1.,
-                500.,
-                50.,
-            ))
-            .with(UiText::new(
-                self.font.clone(),
-                "Tests passes a 0%".to_string(),
-                [1., 1., 1., 1.],
-                60.,
-            ))
-            .build();
-
-        data.world.insert(Texts {
-            hide: Some(hide),
-            code: Some(code),
-        });
-
         initialize_camera(data.world);
+
+        let texts = ui::create_texts(data.world, &self.font);
+        data.world.insert(texts);
 
         let entity = initialize_light(data.world);
         data.world.insert(entity);
@@ -312,6 +264,7 @@ fn main() -> amethyst::Result<()> {
         )
         .with(ScreamerSystem, "screamer", &[])
         .with(HidingSystem, "hiding", &[])
+        .with(TextSystem, "text", &[])
         .with_bundle(ArcBallControlBundle::<StringBindings>::new().with_sensitivity(0.1, 0.1))?
         .with_bundle(TransformBundle::new().with_dep(&["arc_ball_rotation"]))?
         .with_bundle(
