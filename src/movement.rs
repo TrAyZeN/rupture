@@ -1,9 +1,12 @@
 use amethyst::{
     controls::FlyControlTag,
-    core::math::{convert, Unit, Vector3},
+    core::{
+        math::{convert, Unit, Vector3},
+        Time, Transform,
+    },
     derive::SystemDesc,
     ecs::{Join, Read, ReadStorage, System, SystemData, Write, WriteStorage},
-    input::{get_input_axis_simple, BindingTypes, InputHandler, StringBindings},
+    input::{get_input_axis_simple, InputHandler, StringBindings},
 };
 
 use crate::{space::*, PlayerHidden};
@@ -12,15 +15,15 @@ use crate::{space::*, PlayerHidden};
 #[system_desc(name(RuptureMovementSystemDesc))]
 pub struct RuptureMovementSystem {
     speed: f32,
-    right_input_axis: Option<StringBindings::Axis>,
-    forward_input_axis: Option<StringBindings::Axis>,
+    right_input_axis: Option<String>,
+    forward_input_axis: Option<String>,
 }
 
 impl RuptureMovementSystem {
     pub fn new(
         speed: f32,
-        right_input_axis: Option<StringBindings::Axis>,
-        forward_input_axis: Option<StringBindings::Axis>,
+        right_input_axis: Option<String>,
+        forward_input_axis: Option<String>,
     ) -> Self {
         RuptureMovementSystem {
             speed,

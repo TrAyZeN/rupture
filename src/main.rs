@@ -12,8 +12,7 @@ use amethyst::{
         palette::rgb::Rgb,
         plugins::{RenderShaded3D, RenderSkybox, RenderToWindow},
         types::DefaultBackend,
-        Camera, ImageFormat, RenderingBundle, Sprite, SpriteRender, SpriteSheet, SpriteSheetFormat,
-        Texture,
+        Camera, ImageFormat, RenderingBundle, SpriteSheet, SpriteSheetFormat, Texture,
     },
     ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiText, UiTransform},
     utils::{application_root_dir, auto_fov::AutoFovSystem},
@@ -22,14 +21,14 @@ use amethyst::{
 
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
 
-use crate::hide::HidingSystem;
-use crate::movement::RuptureMovementSystem;
-use crate::screamer::ScreamerSystem;
-
 mod hide;
 mod movement;
 mod screamer;
 mod space;
+
+use hide::HidingSystem;
+use movement::RuptureMovementSystem;
+use screamer::ScreamerSystem;
 
 const MAX_CODE: u8 = 10;
 
@@ -70,7 +69,28 @@ impl SimpleState for LoadingState {
             &mut self.progress_counter,
             &data.world.read_resource(),
         ));
-        self.afit = Some(load_sprite_sheet(data.world, &mut self.progress_counter));
+
+        let texture_handle = {
+            let loader = data.world.read_resource::<Loader>();
+            let texture_storage = data.world.read_resource::<AssetStorage<Texture>>();
+
+            loader.load(
+                "textures/afit.png",
+                ImageFormat::default(),
+                &mut self.progress_counter,
+                &texture_storage,
+            )
+        };
+
+        let loader = data.world.read_resource::<Loader>();
+        let sprite_sheet_store = data.world.read_resource::<AssetStorage<SpriteSheet>>();
+
+        self.afit = Some(loader.load(
+            "textures/afit_spritesheet.ron", // Here we load the associated ron file
+            SpriteSheetFormat(texture_handle),
+            &mut self.progress_counter,
+            &sprite_sheet_store,
+        ))
     }
 
     fn update(&mut self, _data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
@@ -89,31 +109,6 @@ impl SimpleState for LoadingState {
             Trans::None
         }
     }
-}
-
-fn load_sprite_sheet(
-    world: &mut World,
-    progress_counter: &mut ProgressCounter,
-) -> Handle<SpriteSheet> {
-    let texture_handle = {
-        let loader = world.read_resource::<Loader>();
-        let texture_storage = world.read_resource::<AssetStorage<Texture>>();
-        loader.load(
-            "textures/afit.png",
-            ImageFormat::default(),
-            progress_counter,
-            &texture_storage,
-        )
-    };
-
-    let loader = world.read_resource::<Loader>();
-    let sprite_sheet_store = world.read_resource::<AssetStorage<SpriteSheet>>();
-    loader.load(
-        "textures/afit_spritesheet.ron", // Here we load the associated ron file
-        SpriteSheetFormat(texture_handle),
-        progress_counter,
-        &sprite_sheet_store,
-    )
 }
 
 struct GameState {
@@ -174,7 +169,7 @@ impl SimpleState for GameState {
             coming: Some(self.coming.clone()),
         });
 
-        let afit = data.world.create_entity().with(SpriteRender);
+        //let afit = data.world.create_entity().with(SpriteRender);
 
         let hide = data
             .world
@@ -300,7 +295,7 @@ fn main() -> amethyst::Result<()> {
             &[], // This is important so that entity instantiation is performed in a single frame.
         )
         .with(
-            RuptureMovementSystem::<StringBindings>::new(
+            RuptureMovementSystem::new(
                 2.5,
                 Some(String::from("move_x")),
                 Some(String::from("move_z")),
