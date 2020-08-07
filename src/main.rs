@@ -304,7 +304,7 @@ fn main() -> amethyst::Result<()> {
         )
         .with(
             RuptureMovementSystem::<StringBindings>::new(
-                5.,
+                2.5,
                 Some(String::from("move_x")),
                 Some(String::from("move_z")),
             ),
