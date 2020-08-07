@@ -12,7 +12,7 @@ use amethyst::{
         palette::rgb::Rgb,
         plugins::{RenderShaded3D, RenderSkybox, RenderToWindow},
         types::DefaultBackend,
-        Camera, ImageFormat, RenderingBundle, Sprite, SpriteRender, SpriteSheet, SpriteSheetFormat,
+        Camera, ImageFormat, RenderingBundle, SpriteRender, SpriteSheet, SpriteSheetFormat,
         Texture,
     },
     ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiText, UiTransform},
@@ -300,7 +300,7 @@ fn main() -> amethyst::Result<()> {
             &[], // This is important so that entity instantiation is performed in a single frame.
         )
         .with(
-            RuptureMovementSystem::<StringBindings>::new(
+            RuptureMovementSystem::new(
                 2.5,
                 Some(String::from("move_x")),
                 Some(String::from("move_z")),
