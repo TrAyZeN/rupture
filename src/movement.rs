@@ -1,13 +1,15 @@
 use amethyst::{
     controls::FlyControlTag,
-    core::math::{convert, Unit, Vector3},
+    core::{
+        math::{convert, Unit, Vector3},
+        Time, Transform,
+    },
     derive::SystemDesc,
     ecs::{Join, Read, ReadStorage, System, SystemData, Write, WriteStorage},
     input::{get_input_axis_simple, InputHandler, StringBindings},
 };
 
 use crate::{space::*, PlayerHidden};
-use amethyst::core::{Time, Transform};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(RuptureMovementSystemDesc))]

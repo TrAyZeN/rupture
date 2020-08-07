@@ -23,14 +23,14 @@ use amethyst::{
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
 
 const COMPUTER_NUMBER: i32 = 32;
-use crate::hide::HidingSystem;
-use crate::movement::RuptureMovementSystem;
-use crate::screamer::ScreamerSystem;
-
 mod hide;
 mod movement;
 mod screamer;
 mod space;
+
+use hide::HidingSystem;
+use movement::RuptureMovementSystem;
+use screamer::ScreamerSystem;
 
 const MAX_CODE: u8 = 10;
 
@@ -44,10 +44,10 @@ pub struct LoadingState {
 }
 
 impl LoadingState {
-    fn load_sprite_sheet(&mut self, data: &StateData<'_, GameData<'_, '_>>) -> Handle<SpriteSheet> {
+    fn load_sprite_sheet(&mut self, world: &World) -> Handle<SpriteSheet> {
         let texture_handle = {
-            let loader = data.world.read_resource::<Loader>();
-            let texture_storage = data.world.read_resource::<AssetStorage<Texture>>();
+            let loader = world.read_resource::<Loader>();
+            let texture_storage = world.read_resource::<AssetStorage<Texture>>();
             loader.load(
                 "textures/afit.png",
                 ImageFormat::default(),
@@ -56,8 +56,9 @@ impl LoadingState {
             )
         };
 
-        let loader = data.world.read_resource::<Loader>();
-        let sprite_sheet_store = data.world.read_resource::<AssetStorage<SpriteSheet>>();
+        let loader = world.read_resource::<Loader>();
+        let sprite_sheet_store = world.read_resource::<AssetStorage<SpriteSheet>>();
+
         loader.load(
             "textures/afit_spritesheet.ron", // Here we load the associated ron file
             SpriteSheetFormat(texture_handle),
@@ -95,7 +96,8 @@ impl SimpleState for LoadingState {
             &mut self.progress_counter,
             &data.world.read_resource(),
         ));
-        self.afit = Some(self.load_sprite_sheet(&data));
+
+        self.afit = Some(self.load_sprite_sheet(&data.world));
     }
 
     fn update(&mut self, _data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
@@ -110,7 +112,7 @@ impl SimpleState for LoadingState {
                 font: self.font.take().expect("iléou le crow.ttf D:"),
                 afit: SpriteRender {
                     sprite_sheet: self.afit.take().expect("iléou le afit.png"),
-                    sprite_number: 0
+                    sprite_number: 0,
                 },
                 score: 0.0,
                 unlocked_computers: Vec::new(),
