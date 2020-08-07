@@ -1,54 +1,101 @@
-use amethyst::animation::VertexSkinningBundle;
-use amethyst::assets::{AssetStorage, Handle, Loader, ProgressCounter};
-use amethyst::controls::{ArcBallControlBundle, FlyControlTag, HideCursor};
-use amethyst::core::math::{convert, Unit, Vector3};
-use amethyst::core::timing::Time;
-use amethyst::core::Transform;
-use amethyst::input::{
-    get_input_axis_simple, is_key_down, is_mouse_button_down, BindingTypes, InputBundle,
-    InputHandler, StringBindings, VirtualKeyCode,
-};
-use amethyst::renderer::light::{Light, PointLight};
-use amethyst::renderer::palette::rgb::Rgb;
-use amethyst::renderer::Camera;
-use amethyst::utils::auto_fov::AutoFovSystem;
-use amethyst::winit::MouseButton;
 use amethyst::{
-    core::ecs::{Component, Join, NullStorage, Read, ReadStorage, WriteStorage},
-    core::transform::TransformBundle,
+    animation::VertexSkinningBundle,
+    assets::{AssetStorage, Handle, Loader, ProgressCounter},
+    audio::{output::Output, AudioBundle, Mp3Format, Source, SourceHandle},
+    controls::{ArcBallControlBundle, FlyControlTag, HideCursor},
+    core::{math::Vector3, Transform, TransformBundle},
+    ecs::{Entity, Read, World},
+    input::{is_key_down, is_mouse_button_down, InputBundle, StringBindings, VirtualKeyCode},
     prelude::*,
     renderer::{
+        light::{Light, PointLight},
+        palette::rgb::Rgb,
         plugins::{RenderShaded3D, RenderSkybox, RenderToWindow},
         types::DefaultBackend,
-        RenderingBundle,
+        Camera, ImageFormat, RenderingBundle, Sprite, SpriteRender, SpriteSheet, SpriteSheetFormat,
+        Texture,
     },
-    utils::application_root_dir,
+    ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiText, UiTransform},
+    utils::{application_root_dir, auto_fov::AutoFovSystem},
+    winit::MouseButton,
 };
-use amethyst::{
-    derive::SystemDesc,
-    ecs::{System, SystemData, World},
-};
+
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
 
 const COMPUTER_NUMBER: i32 = 32;
+use crate::hide::HidingSystem;
+use crate::movement::RuptureMovementSystem;
+use crate::screamer::ScreamerSystem;
+
+mod hide;
+mod movement;
+mod screamer;
+mod space;
+
+const MAX_CODE: u8 = 10;
 
 pub struct LoadingState {
-    /// Tracks loaded assets.
     progress_counter: ProgressCounter,
-    /// Handle to the player texture.
     scene: Option<Handle<GltfSceneAsset>>,
+    screamer: Option<SourceHandle>,
+    coming: Option<SourceHandle>,
+    font: Option<FontHandle>,
+    afit: Option<Handle<SpriteSheet>>,
+}
+
+impl LoadingState {
+    fn load_sprite_sheet(&mut self, data: &StateData<'_, GameData<'_, '_>>) -> Handle<SpriteSheet> {
+        let texture_handle = {
+            let loader = data.world.read_resource::<Loader>();
+            let texture_storage = data.world.read_resource::<AssetStorage<Texture>>();
+            loader.load(
+                "textures/afit.png",
+                ImageFormat::default(),
+                &mut self.progress_counter,
+                &texture_storage,
+            )
+        };
+
+        let loader = data.world.read_resource::<Loader>();
+        let sprite_sheet_store = data.world.read_resource::<AssetStorage<SpriteSheet>>();
+        loader.load(
+            "textures/afit_spritesheet.ron", // Here we load the associated ron file
+            SpriteSheetFormat(texture_handle),
+            &mut self.progress_counter,
+            &sprite_sheet_store,
+        )
+    }
 }
 
 impl SimpleState for LoadingState {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let loader = data.world.read_resource::<Loader>();
-        let scene = loader.load(
+
+        self.scene = Some(loader.load(
             "models/SalleMachine.glb",
             GltfSceneFormat::default(),
             &mut self.progress_counter,
-            &data.world.read_resource::<AssetStorage<GltfSceneAsset>>(),
-        );
-        self.scene = Some(scene);
+            &data.world.read_resource(),
+        ));
+        self.screamer = Some(loader.load(
+            "sounds/screamer.mp3",
+            Mp3Format,
+            &mut self.progress_counter,
+            &data.world.read_resource(),
+        ));
+        self.coming = Some(loader.load(
+            "sounds/coming.mp3",
+            Mp3Format,
+            &mut self.progress_counter,
+            &data.world.read_resource(),
+        ));
+        self.font = Some(loader.load(
+            "fonts/crow.ttf",
+            TtfFormat,
+            &mut self.progress_counter,
+            &data.world.read_resource(),
+        ));
+        self.afit = Some(self.load_sprite_sheet(&data));
     }
 
     fn update(&mut self, _data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
@@ -58,8 +105,15 @@ impl SimpleState for LoadingState {
                     "Expected `scene` to exist when \
                         `progress_counter` is complete.",
                 ),
+                screamer: self.screamer.take().expect("iléou le screamer.mp3 :("),
+                coming: self.coming.take().expect("iléou le coming.mp3 :c"),
+                font: self.font.take().expect("iléou le crow.ttf D:"),
+                afit: SpriteRender {
+                    sprite_sheet: self.afit.take().expect("iléou le afit.png"),
+                    sprite_number: 0
+                },
                 score: 0.0,
-                unlocked_computers: Vec::new()
+                unlocked_computers: Vec::new(),
             }))
         } else {
             Trans::None
@@ -69,8 +123,43 @@ impl SimpleState for LoadingState {
 
 struct GameState {
     scene: Handle<GltfSceneAsset>,
+    screamer: SourceHandle,
+    coming: SourceHandle,
+    font: FontHandle,
+    afit: SpriteRender,
     score: f64, // test success rate
     unlocked_computers: Vec<i32>,
+}
+
+#[derive(Default)]
+pub struct Texts {
+    hide: Option<Entity>,
+    code: Option<Entity>,
+}
+
+#[derive(Default)]
+pub struct CodeFound(u8);
+
+#[derive(Default)]
+pub struct TimeToScreamer {
+    at: f64,
+    played: bool,
+}
+
+#[derive(Default)]
+pub struct PlayerLight(Option<Entity>);
+
+#[derive(Default)]
+pub struct Sounds {
+    screamer: Option<SourceHandle>,
+    coming: Option<SourceHandle>,
+}
+
+#[derive(Default)]
+pub struct PlayerHidden {
+    hidden: bool,
+    can_hide: bool,
+    pressed: bool,
 }
 
 impl SimpleState for GameState {
@@ -85,8 +174,64 @@ impl SimpleState for GameState {
             .with(transform)
             .build();
 
+        data.world.insert(CodeFound::default());
+        data.world.insert(TimeToScreamer::default());
+        data.world.insert(Sounds {
+            screamer: Some(self.screamer.clone()),
+            coming: Some(self.coming.clone()),
+        });
+
+        let hide = data
+            .world
+            .create_entity()
+            .with(UiTransform::new(
+                "hide".to_string(),
+                Anchor::BottomRight,
+                Anchor::BottomRight,
+                -50.,
+                50.,
+                1.,
+                650.,
+                50.,
+            ))
+            .with(UiText::new(
+                self.font.clone(),
+                String::new(),
+                [1., 1., 1., 1.],
+                40.,
+            ))
+            .build();
+
+        let code = data
+            .world
+            .create_entity()
+            .with(UiTransform::new(
+                "code".to_string(),
+                Anchor::TopLeft,
+                Anchor::TopLeft,
+                10.,
+                -50.,
+                1.,
+                500.,
+                50.,
+            ))
+            .with(UiText::new(
+                self.font.clone(),
+                "Tests passes a 0%".to_string(),
+                [1., 1., 1., 1.],
+                60.,
+            ))
+            .build();
+
+        data.world.insert(Texts {
+            hide: Some(hide),
+            code: Some(code),
+        });
+
         initialize_camera(data.world);
-        initialize_light(data.world);
+
+        let entity = initialize_light(data.world);
+        data.world.insert(entity);
     }
 
     fn handle_event(
@@ -108,7 +253,7 @@ impl SimpleState for GameState {
     }
 }
 
-fn initialize_light(world: &mut World) {
+fn initialize_light(world: &mut World) -> PlayerLight {
     let light: Light = PointLight {
         color: Rgb::new(1.0, 1.0, 1.0),
         intensity: 2.0,
@@ -120,12 +265,14 @@ fn initialize_light(world: &mut World) {
     let mut transform = Transform::default();
     transform.set_translation_xyz(0.0, 1.5, 0.0);
 
-    world
+    let entity = world
         .create_entity()
         .with(light)
         .with(transform)
         .with(FlyControlTag::default())
         .build();
+
+    PlayerLight(Some(entity))
 }
 
 fn initialize_camera(world: &mut World) {
@@ -159,13 +306,15 @@ fn main() -> amethyst::Result<()> {
         )
         .with(
             RuptureMovementSystem::<StringBindings>::new(
-                5.,
+                2.5,
                 Some(String::from("move_x")),
                 Some(String::from("move_z")),
             ),
             "rupture_movement",
             &[],
         )
+        .with(ScreamerSystem, "screamer", &[])
+        .with(HidingSystem, "hiding", &[])
         .with_bundle(ArcBallControlBundle::<StringBindings>::new().with_sensitivity(0.1, 0.1))?
         .with_bundle(TransformBundle::new().with_dep(&["arc_ball_rotation"]))?
         .with_bundle(
@@ -179,14 +328,21 @@ fn main() -> amethyst::Result<()> {
                         .with_clear([0.34, 0.36, 0.52, 1.0]),
                 )
                 .with_plugin(RenderShaded3D::default())
+                .with_plugin(RenderUi::default())
                 .with_plugin(RenderSkybox::default()),
-        )?;
+        )?
+        .with_bundle(AudioBundle::default())?
+        .with_bundle(UiBundle::<StringBindings>::new())?;
 
     let mut game = Application::new(
         assets_dir,
         LoadingState {
             progress_counter: ProgressCounter::default(),
             scene: None,
+            screamer: None,
+            coming: None,
+            font: None,
+            afit: None,
         },
         game_data,
     )?;
@@ -195,66 +351,16 @@ fn main() -> amethyst::Result<()> {
     Ok(())
 }
 
-#[derive(Debug, SystemDesc)]
-#[system_desc(name(RuptureMovementSystemDesc))]
-pub struct RuptureMovementSystem<T>
-where
-    T: BindingTypes,
-{
-    /// The movement speed of the movement in units per second.
-    speed: f32,
-    /// The name of the input axis to locally move in the x coordinates.
-    right_input_axis: Option<T::Axis>,
-    /// The name of the input axis to locally move in the z coordinates.
-    forward_input_axis: Option<T::Axis>,
-}
-
-impl<T: BindingTypes> RuptureMovementSystem<T> {
-    /// Builds a new `FlyMovementSystem` using the provided speeds and axis controls.
-    pub fn new(
-        speed: f32,
-        right_input_axis: Option<T::Axis>,
-        forward_input_axis: Option<T::Axis>,
-    ) -> Self {
-        RuptureMovementSystem {
-            speed,
-            right_input_axis,
-            forward_input_axis,
-        }
-    }
-}
-
-impl<'a, T: BindingTypes> System<'a> for RuptureMovementSystem<T> {
-    type SystemData = (
-        Read<'a, Time>,
-        WriteStorage<'a, Transform>,
-        Read<'a, InputHandler<T>>,
-        ReadStorage<'a, FlyControlTag>,
-    );
-
-    fn run(&mut self, (time, mut transform, input, tag): Self::SystemData) {
-        let x = get_input_axis_simple(&self.right_input_axis, &input);
-        let z = get_input_axis_simple(&self.forward_input_axis, &input);
-
-        if let Some(dir) = Unit::try_new(Vector3::new(x, 0.0, z), convert(1.0e-6)) {
-            for (transform, _) in (&mut transform, &tag).join() {
-                let delta_sec = time.delta_seconds();
-                let old = transform.translation().clone();
-
-                transform.append_translation_along(dir, delta_sec * self.speed);
-
-                let current = transform.translation().clone();
-                if !is_in_bound(current.x, old.z) {
-                    transform.set_translation_x(old.x);
-                }
-                if !is_in_bound(old.x, current.z) {
-                    transform.set_translation_z(old.z);
-                }
-
-                transform.set_translation_y(old.y);
-
-                println!("{:?}", transform.rotation());
-                // println!("X: {}, Z: {}", current.x, current.z);
+fn play<'s>(
+    storage: &Read<'s, AssetStorage<Source>>,
+    handle: &Option<SourceHandle>,
+    output: &Option<Read<'s, Output>>,
+    volume: f32,
+) {
+    if let Some(output) = output {
+        if let Some(handle) = handle {
+            if let Some(sound) = storage.get(handle) {
+                output.play_once(sound, volume);
             }
         }
     }
