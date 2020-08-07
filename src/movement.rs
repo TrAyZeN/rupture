@@ -10,6 +10,7 @@ use amethyst::{
 };
 
 use crate::{space::*, PlayerHidden};
+use amethyst::core::{Time, Transform};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(RuptureMovementSystemDesc))]
