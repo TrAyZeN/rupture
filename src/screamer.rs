@@ -48,13 +48,7 @@ impl<'s> System<'s> for ScreamerSystem {
         }
 
         if time.absolute_time_seconds() - since.last_displayed > 3.5 && since.display {
-            if let Some(bashar) = screamer.bashar {
-                if let Some(transform) = ui.get_mut(bashar) {
-                    transform.width = 0.;
-                    transform.height = 0.;
-                    since.display = false;
-                }
-            }
+            std::process::exit(0);
         }
 
         if time.absolute_time_seconds() > since.at {

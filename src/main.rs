@@ -1,4 +1,3 @@
-use amethyst::ui::UiImage;
 use amethyst::{
     animation::VertexSkinningBundle,
     assets::{AssetStorage, Handle, Loader, ProgressCounter},
@@ -16,7 +15,7 @@ use amethyst::{
         Camera, ImageFormat, RenderingBundle, SpriteRender, SpriteSheet, SpriteSheetFormat,
         Texture,
     },
-    ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiTransform},
+    ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiImage, UiTransform},
     utils::{application_root_dir, auto_fov::AutoFovSystem},
     winit::MouseButton,
 };
@@ -212,8 +211,8 @@ impl SimpleState for GameState {
             .create_entity()
             .with(UiTransform::new(
                 "bashar".to_string(),
-                Anchor::TopLeft,
-                Anchor::TopLeft,
+                Anchor::Middle,
+                Anchor::Middle,
                 0.,
                 0.,
                 0.,

@@ -10,7 +10,7 @@ use amethyst::{
 };
 
 use crate::ui::Reading;
-use crate::{space::*, PlayerHidden};
+use crate::{space::*, PlayerHidden, TimeToScreamer};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(RuptureMovementSystemDesc))]
@@ -42,19 +42,19 @@ impl<'a> System<'a> for RuptureMovementSystem {
         ReadStorage<'a, FlyControlTag>,
         Write<'a, PlayerHidden>,
         Read<'a, Reading>,
+        Read<'a, TimeToScreamer>,
     );
 
-    fn run(&mut self, (time, mut transform, input, tag, mut hide, reading): Self::SystemData) {
-        if reading.0 {
+    fn run(
+        &mut self,
+        (time, mut transform, input, tag, mut hide, reading, since): Self::SystemData,
+    ) {
+        if reading.0 || hide.hidden || since.last_displayed != 0.0 {
             return;
         }
 
         let x = get_input_axis_simple(&self.right_input_axis, &input);
         let z = get_input_axis_simple(&self.forward_input_axis, &input);
-
-        if hide.hidden {
-            return;
-        }
 
         if let Some(dir) = Unit::try_new(Vector3::new(x, 0.0, z), convert(1.0e-6)) {
             for (transform, _) in (&mut transform, &tag).join() {
