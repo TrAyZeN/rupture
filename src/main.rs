@@ -1,33 +1,40 @@
-use amethyst::animation::VertexSkinningBundle;
-use amethyst::assets::{AssetStorage, Handle, Loader, ProgressCounter};
-use amethyst::controls::{ArcBallControlBundle, FlyControlTag, HideCursor};
-use amethyst::core::math::{convert, Unit, Vector3};
-use amethyst::core::timing::Time;
-use amethyst::core::Transform;
-use amethyst::input::{
-    get_input_axis_simple, is_key_down, is_mouse_button_down, BindingTypes, InputBundle,
-    InputHandler, StringBindings, VirtualKeyCode,
-};
-use amethyst::renderer::light::{Light, PointLight};
-use amethyst::renderer::palette::rgb::Rgb;
-use amethyst::renderer::Camera;
-use amethyst::utils::auto_fov::AutoFovSystem;
-use amethyst::winit::MouseButton;
 use amethyst::{
-    audio::{output::Output, AudioBundle, Mp3Format, Source, SourceHandle},
+    audio::{AudioBundle, Mp3Format, output::Output, Source, SourceHandle},
     core::transform::TransformBundle,
-    derive::SystemDesc,
-    ecs::{Entity, Join, Read, ReadStorage, System, SystemData, World, Write, WriteStorage},
+    ecs::{Entity, Read, World},
     prelude::*,
     renderer::{
         plugins::{RenderShaded3D, RenderSkybox, RenderToWindow},
-        types::DefaultBackend,
         RenderingBundle,
+        types::DefaultBackend,
     },
     ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiText, UiTransform},
     utils::application_root_dir,
 };
+use amethyst::animation::VertexSkinningBundle;
+use amethyst::assets::{AssetStorage, Handle, Loader, ProgressCounter};
+use amethyst::controls::{ArcBallControlBundle, FlyControlTag, HideCursor};
+use amethyst::core::math::Vector3;
+use amethyst::core::Transform;
+use amethyst::input::{
+    InputBundle, is_key_down,
+    is_mouse_button_down, StringBindings, VirtualKeyCode,
+};
+use amethyst::renderer::{Camera, ImageFormat, Sprite, SpriteRender, SpriteSheet, SpriteSheetFormat, Texture};
+use amethyst::renderer::light::{Light, PointLight};
+use amethyst::renderer::palette::rgb::Rgb;
+use amethyst::utils::auto_fov::AutoFovSystem;
+use amethyst::winit::MouseButton;
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
+
+use crate::hide::HidingSystem;
+use crate::movement::RuptureMovementSystem;
+use crate::screamer::ScreamerSystem;
+
+mod movement;
+mod screamer;
+mod hide;
+mod space;
 
 pub struct LoadingState {
     progress_counter: ProgressCounter,
@@ -35,6 +42,7 @@ pub struct LoadingState {
     screamer: Option<SourceHandle>,
     coming: Option<SourceHandle>,
     font: Option<FontHandle>,
+    afit: Option<Handle<SpriteSheet>>,
 }
 
 impl SimpleState for LoadingState {
@@ -65,6 +73,7 @@ impl SimpleState for LoadingState {
             &mut self.progress_counter,
             &data.world.read_resource(),
         ));
+        self.afit = Some(load_sprite_sheet(data.world, &mut self.progress_counter));
     }
 
     fn update(&mut self, _data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
@@ -77,6 +86,7 @@ impl SimpleState for LoadingState {
                 screamer: self.screamer.take().expect("iléou le screamer.mp3 :("),
                 coming: self.coming.take().expect("iléou le coming.mp3 :c"),
                 font: self.font.take().expect("iléou le crow.ttf D:"),
+                afit: self.afit.take().expect("iléou le afit.png"),
             }))
         } else {
             Trans::None
@@ -84,11 +94,34 @@ impl SimpleState for LoadingState {
     }
 }
 
+fn load_sprite_sheet(world: &mut World, progress_counter: &mut ProgressCounter) -> Handle<SpriteSheet> {
+    let texture_handle = {
+        let loader = world.read_resource::<Loader>();
+        let texture_storage = world.read_resource::<AssetStorage<Texture>>();
+        loader.load(
+            "textures/afit.png",
+            ImageFormat::default(),
+            progress_counter,
+            &texture_storage,
+        )
+    };
+
+    let loader = world.read_resource::<Loader>();
+    let sprite_sheet_store = world.read_resource::<AssetStorage<SpriteSheet>>();
+    loader.load(
+        "textures/afit_spritesheet.ron", // Here we load the associated ron file
+        SpriteSheetFormat(texture_handle),
+        progress_counter,
+        &sprite_sheet_store,
+    )
+}
+
 struct GameState {
     scene: Handle<GltfSceneAsset>,
     screamer: SourceHandle,
     coming: SourceHandle,
     font: FontHandle,
+    afit: Handle<SpriteSheet>,
 }
 
 #[derive(Default)]
@@ -141,6 +174,11 @@ impl SimpleState for GameState {
             coming: Some(self.coming.clone()),
         });
 
+        let afit = data
+            .world
+            .create_entity()
+            .with(SpriteRender)
+
         let hide = data
             .world
             .create_entity()
@@ -177,7 +215,7 @@ impl SimpleState for GameState {
             ))
             .with(UiText::new(
                 self.font.clone(),
-                "Tests passes à 0%".to_string(),
+                "Tests passes a 0%".to_string(),
                 [1., 1., 1., 1.],
                 60.,
             ))
@@ -220,7 +258,7 @@ fn initialize_light(world: &mut World) -> PlayerLight {
         smoothness: 1.0,
         ..PointLight::default()
     }
-    .into();
+        .into();
 
     let mut transform = Transform::default();
     transform.set_translation_xyz(0.0, 1.5, 0.0);
@@ -310,171 +348,6 @@ fn main() -> amethyst::Result<()> {
     Ok(())
 }
 
-#[derive(Debug, SystemDesc)]
-#[system_desc(name(RuptureMovementSystemDesc))]
-pub struct RuptureMovementSystem<T>
-where
-    T: BindingTypes,
-{
-    /// The movement speed of the movement in units per second.
-    speed: f32,
-    /// The name of the input axis to locally move in the x coordinates.
-    right_input_axis: Option<T::Axis>,
-    /// The name of the input axis to locally move in the z coordinates.
-    forward_input_axis: Option<T::Axis>,
-}
-
-impl<T: BindingTypes> RuptureMovementSystem<T> {
-    /// Builds a new `FlyMovementSystem` using the provided speeds and axis controls.
-    pub fn new(
-        speed: f32,
-        right_input_axis: Option<T::Axis>,
-        forward_input_axis: Option<T::Axis>,
-    ) -> Self {
-        RuptureMovementSystem {
-            speed,
-            right_input_axis,
-            forward_input_axis,
-        }
-    }
-}
-
-impl<'a, T: BindingTypes> System<'a> for RuptureMovementSystem<T> {
-    type SystemData = (
-        Read<'a, Time>,
-        WriteStorage<'a, Transform>,
-        Read<'a, InputHandler<T>>,
-        ReadStorage<'a, FlyControlTag>,
-        Write<'a, PlayerHidden>,
-    );
-
-    fn run(&mut self, (time, mut transform, input, tag, mut hide): Self::SystemData) {
-        let x = get_input_axis_simple(&self.right_input_axis, &input);
-        let z = get_input_axis_simple(&self.forward_input_axis, &input);
-
-        if hide.hidden {
-            return;
-        }
-
-        if let Some(dir) = Unit::try_new(Vector3::new(x, 0.0, z), convert(1.0e-6)) {
-            for (transform, _) in (&mut transform, &tag).join() {
-                let delta_sec = time.delta_seconds();
-                let old = transform.translation().clone();
-
-                transform.append_translation_along(dir, delta_sec * self.speed);
-
-                let current = transform.translation().clone();
-                if !is_in_bound(current.x, old.z) {
-                    transform.set_translation_x(old.x);
-                }
-                if !is_in_bound(old.x, current.z) {
-                    transform.set_translation_z(old.z);
-                }
-
-                let current = transform.translation().clone();
-                hide.can_hide = is_close_from_computer(current.x, current.z)
-                    || is_close_from_computer(current.x + 14.0, current.z);
-
-                transform.set_translation_y(old.y);
-
-                println!("X: {}, Z: {}", current.x, current.z);
-            }
-        }
-    }
-}
-
-#[derive(Debug, SystemDesc)]
-#[system_desc(name(ScreamerSystemDesc))]
-pub struct ScreamerSystem;
-
-impl<'s> System<'s> for ScreamerSystem {
-    type SystemData = (
-        Read<'s, Time>,
-        Read<'s, AssetStorage<Source>>,
-        Read<'s, Sounds>,
-        Option<Read<'s, Output>>,
-        Read<'s, CodeFound>,
-        Write<'s, TimeToScreamer>,
-        Read<'s, PlayerHidden>,
-    );
-
-    fn run(&mut self, (time, storage, sound, output, found, mut since, hidden): Self::SystemData) {
-        if since.at == 0.0 {
-            since.at = time.absolute_time_seconds() + 15.0 + rand::random::<f64>() * 10.0;
-        }
-
-        if time.absolute_time_seconds() > since.at - (1.0 + (3.0 / (found.0 as f64 + 1.0)))
-            && !since.played
-        {
-            play(&storage, &sound.coming, &output, 0.65);
-            since.played = true;
-        }
-
-        if time.absolute_time_seconds() > since.at {
-            if !hidden.hidden {
-                play(&storage, &sound.screamer, &output, 0.9);
-            }
-
-            since.played = false;
-            since.at = time.absolute_time_seconds()
-                + 5.0
-                + (10.0 / (found.0 as f64 + 1.0))
-                + rand::random::<f64>() * 10.0;
-        }
-    }
-}
-
-#[derive(Debug, SystemDesc)]
-#[system_desc(name(HidingSystemDesc))]
-pub struct HidingSystem;
-
-impl<'s> System<'s> for HidingSystem {
-    type SystemData = (
-        Write<'s, PlayerHidden>,
-        WriteStorage<'s, UiText>,
-        Read<'s, Texts>,
-        Read<'s, InputHandler<StringBindings>>,
-        WriteStorage<'s, Light>,
-        Read<'s, PlayerLight>,
-    );
-
-    fn run(&mut self, (mut hidden, mut ui, texts, bindings, mut lights, light): Self::SystemData) {
-        if let Some(hide) = texts.hide {
-            if let Some(text) = ui.get_mut(hide) {
-                if hidden.hidden {
-                    text.text = "Rappuyez sur 'P' pour ne plus vous cacher".to_string();
-                } else if hidden.can_hide {
-                    text.text = "Appuyez sur 'P' pour vous cacher".to_string();
-                } else {
-                    text.text = String::new();
-                }
-            }
-        }
-
-        if let Some(pressed) = bindings.action_is_down("hide") {
-            if pressed && !hidden.pressed {
-                hidden.pressed = true;
-                hidden.hidden = !hidden.hidden;
-            }
-
-            if !pressed && hidden.pressed {
-                hidden.pressed = false;
-            }
-        }
-
-        if let Some(light) = light.0 {
-            if let Some(light) = lights.get_mut(light) {
-                match light {
-                    Light::Point(point) => {
-                        point.intensity = if hidden.hidden { 0.0 } else { 2.0 };
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-}
-
 fn play<'s>(
     storage: &Read<'s, AssetStorage<Source>>,
     handle: &Option<SourceHandle>,
@@ -488,24 +361,4 @@ fn play<'s>(
             }
         }
     }
-}
-
-// Oui c'est dégueulasse, mais est-ce qu'il y a vraiment une autre solution xd
-fn is_in_bound(x: f32, z: f32) -> bool {
-    (x > -25.0 && z > -2.65 && x < 0.65 && z < 0.65) // Couloir
-        || is_in_room(x, z) // Salle droite
-        || is_in_room(x + 14.0, z) // Salle gauche
-}
-
-fn is_in_room(x: f32, z: f32) -> bool {
-    (x > -2.35 && z > -3.35 && x < -1.55 && z < -2.65) // Porte droite
-        || (x > -10.55 && z > -3.35 && x < -9.55 && z < -2.65) // Porte gauche 
-        || (x > -12.75 && z > -7.0 && x < 0.55 && z < -3.35) // Entrée salle
-        || is_close_from_computer(x, z)
-}
-
-fn is_close_from_computer(x: f32, z: f32) -> bool {
-    (x > -0.85 && z > -22.5 && x < 0.55 && z < -7.0) // Inter droit
-        || (x > -8.8 && z > -22.5 && x < -3.1 && z < -7.0) // Inter centre
-        || (x > -12.75 && z > -22.5 && x < -11.25 && z < -7.0) // Inter gauche
 }
