@@ -147,6 +147,7 @@ struct GameState {
 #[derive(Default)]
 pub struct CodeFound(u8);
 
+#[derive(Default)]
 pub struct Texts {
     hide: Option<Entity>,
     _use: Option<Entity>,
