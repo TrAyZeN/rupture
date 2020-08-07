@@ -30,6 +30,8 @@ use amethyst::{
 };
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
 
+const COMPUTER_NUMBER: i32 = 32;
+
 pub struct LoadingState {
     /// Tracks loaded assets.
     progress_counter: ProgressCounter,
@@ -56,6 +58,8 @@ impl SimpleState for LoadingState {
                     "Expected `scene` to exist when \
                         `progress_counter` is complete.",
                 ),
+                score: 0.0,
+                unlocked_computers: Vec::new()
             }))
         } else {
             Trans::None
@@ -65,6 +69,8 @@ impl SimpleState for LoadingState {
 
 struct GameState {
     scene: Handle<GltfSceneAsset>,
+    score: f64, // test success rate
+    unlocked_computers: Vec<i32>,
 }
 
 impl SimpleState for GameState {
@@ -247,7 +253,8 @@ impl<'a, T: BindingTypes> System<'a> for RuptureMovementSystem<T> {
 
                 transform.set_translation_y(old.y);
 
-                println!("X: {}, Z: {}", current.x, current.z);
+                println!("{:?}", transform.rotation());
+                // println!("X: {}, Z: {}", current.x, current.z);
             }
         }
     }
@@ -262,9 +269,32 @@ fn is_in_bound(x: f32, z: f32) -> bool {
 
 fn is_in_room(x: f32, z: f32) -> bool {
     (x > -2.35 && z > -3.35 && x < -1.55 && z < -2.65) // Porte droite
-        || (x > -10.55 && z > -3.35 && x < -9.55 && z < -2.65) // Porte gauche 
+        || (x > -10.55 && z > -3.35 && x < -9.55 && z < -2.65) // Porte gauche
         || (x > -12.75 && z > -7.0 && x < 0.55 && z < -3.35) // Entrée salle
         || (x > -0.85 && z > -22.5 && x < 0.55 && z < -7.0) // Inter droit
         || (x > -8.8 && z > -22.5 && x < -3.1 && z < -7.0) // Inter centre
         || (x > -12.75 && z > -22.5 && x < -11.25 && z < -7.0) // Inter gauche
+}
+
+// On stack les trucs degueux ici
+const COMPUTER_ROW_X: [f32; 4] = [
+    -0.5,
+    -8.2,
+    -14.3,
+    -22.384,
+];
+
+fn is_able_to_use_computer(player_transform: &Transform, computer_id: i32) -> bool {
+    let trigger_x = {
+        let mut row_x = COMPUTER_ROW_X[computer_id as usize / 8];
+        if computer_id % 8 >= 4 {
+            row_x -= 2.5;
+        }
+        row_x
+    };
+    let trigger_z = -7.38 - (computer_id % 4) as f32 * 4.1;
+
+    let pos = player_transform.translation();
+    pos.x >= trigger_x-0.35 && pos.z >= trigger_z-1.8
+        && pos.x <= trigger_x && pos.z <= trigger_z
 }
