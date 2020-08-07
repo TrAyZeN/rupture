@@ -9,7 +9,7 @@ use amethyst::{
     input::{get_input_axis_simple, InputHandler, StringBindings},
 };
 
-use crate::{space::*, PlayerHidden};
+use crate::{PlayerHidden, space::*};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(RuptureMovementSystemDesc))]
