@@ -1,8 +1,10 @@
-use amethyst::core::ecs::{Read, System, SystemData, Write, WriteStorage};
-use amethyst::derive::SystemDesc;
-use amethyst::input::{InputHandler, StringBindings};
-use amethyst::renderer::light::Light;
-use amethyst::ui::UiText;
+use amethyst::{
+    derive::SystemDesc,
+    ecs::{Read, System, SystemData, Write, WriteStorage},
+    input::{InputHandler, StringBindings},
+    renderer::light::Light,
+    ui::UiText,
+};
 
 use crate::{PlayerHidden, PlayerLight, Texts};
 

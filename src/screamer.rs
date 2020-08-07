@@ -1,11 +1,12 @@
-use amethyst::assets::AssetStorage;
-use amethyst::audio::output::Output;
-use amethyst::audio::Source;
-use amethyst::core::ecs::{Read, System, SystemData, Write};
-use amethyst::core::Time;
-use amethyst::derive::SystemDesc;
+use amethyst::{
+    assets::AssetStorage,
+    audio::{output::Output, Source},
+    core::Time,
+    derive::SystemDesc,
+    ecs::{Read, System, SystemData, Write},
+};
 
-use crate::{CodeFound, play, PlayerHidden, Sounds, TimeToScreamer};
+use crate::{play, CodeFound, PlayerHidden, Sounds, TimeToScreamer, MAX_CODE};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(ScreamerSystemDesc))]
@@ -42,7 +43,7 @@ impl<'s> System<'s> for ScreamerSystem {
             since.played = false;
             since.at = time.absolute_time_seconds()
                 + 5.0
-                + (10.0 / (found.0 as f64 + 1.0))
+                + (MAX_CODE as f64 / (found.0 as f64 + 1.0))
                 + rand::random::<f64>() * 10.0;
         }
     }

@@ -1,40 +1,37 @@
 use amethyst::{
-    audio::{AudioBundle, Mp3Format, output::Output, Source, SourceHandle},
-    core::transform::TransformBundle,
+    animation::VertexSkinningBundle,
+    assets::{AssetStorage, Handle, Loader, ProgressCounter},
+    audio::{output::Output, AudioBundle, Mp3Format, Source, SourceHandle},
+    controls::{ArcBallControlBundle, FlyControlTag, HideCursor},
+    core::{math::Vector3, Transform, TransformBundle},
     ecs::{Entity, Read, World},
+    input::{is_key_down, is_mouse_button_down, InputBundle, StringBindings, VirtualKeyCode},
     prelude::*,
     renderer::{
+        light::{Light, PointLight},
+        palette::rgb::Rgb,
         plugins::{RenderShaded3D, RenderSkybox, RenderToWindow},
-        RenderingBundle,
         types::DefaultBackend,
+        Camera, ImageFormat, RenderingBundle, Sprite, SpriteRender, SpriteSheet, SpriteSheetFormat,
+        Texture,
     },
     ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiText, UiTransform},
-    utils::application_root_dir,
+    utils::{application_root_dir, auto_fov::AutoFovSystem},
+    winit::MouseButton,
 };
-use amethyst::animation::VertexSkinningBundle;
-use amethyst::assets::{AssetStorage, Handle, Loader, ProgressCounter};
-use amethyst::controls::{ArcBallControlBundle, FlyControlTag, HideCursor};
-use amethyst::core::math::Vector3;
-use amethyst::core::Transform;
-use amethyst::input::{
-    InputBundle, is_key_down,
-    is_mouse_button_down, StringBindings, VirtualKeyCode,
-};
-use amethyst::renderer::{Camera, ImageFormat, Sprite, SpriteRender, SpriteSheet, SpriteSheetFormat, Texture};
-use amethyst::renderer::light::{Light, PointLight};
-use amethyst::renderer::palette::rgb::Rgb;
-use amethyst::utils::auto_fov::AutoFovSystem;
-use amethyst::winit::MouseButton;
+
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
 
 use crate::hide::HidingSystem;
 use crate::movement::RuptureMovementSystem;
 use crate::screamer::ScreamerSystem;
 
+mod hide;
 mod movement;
 mod screamer;
-mod hide;
 mod space;
+
+const MAX_CODE: u8 = 10;
 
 pub struct LoadingState {
     progress_counter: ProgressCounter,
@@ -94,7 +91,10 @@ impl SimpleState for LoadingState {
     }
 }
 
-fn load_sprite_sheet(world: &mut World, progress_counter: &mut ProgressCounter) -> Handle<SpriteSheet> {
+fn load_sprite_sheet(
+    world: &mut World,
+    progress_counter: &mut ProgressCounter,
+) -> Handle<SpriteSheet> {
     let texture_handle = {
         let loader = world.read_resource::<Loader>();
         let texture_storage = world.read_resource::<AssetStorage<Texture>>();
@@ -174,10 +174,7 @@ impl SimpleState for GameState {
             coming: Some(self.coming.clone()),
         });
 
-        let afit = data
-            .world
-            .create_entity()
-            .with(SpriteRender)
+        let afit = data.world.create_entity().with(SpriteRender);
 
         let hide = data
             .world
@@ -258,7 +255,7 @@ fn initialize_light(world: &mut World) -> PlayerLight {
         smoothness: 1.0,
         ..PointLight::default()
     }
-        .into();
+    .into();
 
     let mut transform = Transform::default();
     transform.set_translation_xyz(0.0, 1.5, 0.0);
@@ -340,6 +337,7 @@ fn main() -> amethyst::Result<()> {
             screamer: None,
             coming: None,
             font: None,
+            afit: None,
         },
         game_data,
     )?;

@@ -1,32 +1,26 @@
-use amethyst::controls::FlyControlTag;
-use amethyst::core::{Time, Transform};
-use amethyst::core::ecs::{Join, Read, ReadStorage, System, SystemData, Write, WriteStorage};
-use amethyst::core::math::{convert, Unit, Vector3};
-use amethyst::derive::SystemDesc;
-use amethyst::input::{BindingTypes, get_input_axis_simple, InputHandler};
+use amethyst::{
+    controls::FlyControlTag,
+    core::math::{convert, Unit, Vector3},
+    derive::SystemDesc,
+    ecs::{Join, Read, ReadStorage, System, SystemData, Write, WriteStorage},
+    input::{get_input_axis_simple, BindingTypes, InputHandler, StringBindings},
+};
 
-use crate::{PlayerHidden, space::*};
+use crate::{space::*, PlayerHidden};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(RuptureMovementSystemDesc))]
-pub struct RuptureMovementSystem<T>
-    where
-        T: BindingTypes,
-{
-    /// The movement speed of the movement in units per second.
+pub struct RuptureMovementSystem {
     speed: f32,
-    /// The name of the input axis to locally move in the x coordinates.
-    right_input_axis: Option<T::Axis>,
-    /// The name of the input axis to locally move in the z coordinates.
-    forward_input_axis: Option<T::Axis>,
+    right_input_axis: Option<StringBindings::Axis>,
+    forward_input_axis: Option<StringBindings::Axis>,
 }
 
-impl<T: BindingTypes> RuptureMovementSystem<T> {
-    /// Builds a new `FlyMovementSystem` using the provided speeds and axis controls.
+impl RuptureMovementSystem {
     pub fn new(
         speed: f32,
-        right_input_axis: Option<T::Axis>,
-        forward_input_axis: Option<T::Axis>,
+        right_input_axis: Option<StringBindings::Axis>,
+        forward_input_axis: Option<StringBindings::Axis>,
     ) -> Self {
         RuptureMovementSystem {
             speed,
@@ -36,11 +30,11 @@ impl<T: BindingTypes> RuptureMovementSystem<T> {
     }
 }
 
-impl<'a, T: BindingTypes> System<'a> for RuptureMovementSystem<T> {
+impl<'a> System<'a> for RuptureMovementSystem {
     type SystemData = (
         Read<'a, Time>,
         WriteStorage<'a, Transform>,
-        Read<'a, InputHandler<T>>,
+        Read<'a, InputHandler<StringBindings>>,
         ReadStorage<'a, FlyControlTag>,
         Write<'a, PlayerHidden>,
     );
