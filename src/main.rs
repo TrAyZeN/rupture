@@ -14,8 +14,10 @@ use amethyst::renderer::Camera;
 use amethyst::utils::auto_fov::AutoFovSystem;
 use amethyst::winit::MouseButton;
 use amethyst::{
-    core::ecs::{Component, Join, NullStorage, Read, ReadStorage, WriteStorage},
+    audio::{output::Output, AudioBundle, Mp3Format, Source, SourceHandle},
     core::transform::TransformBundle,
+    derive::SystemDesc,
+    ecs::{Join, Read, ReadStorage, System, SystemData, World, Write, WriteStorage},
     prelude::*,
     renderer::{
         plugins::{RenderShaded3D, RenderSkybox, RenderToWindow},
@@ -24,29 +26,37 @@ use amethyst::{
     },
     utils::application_root_dir,
 };
-use amethyst::{
-    derive::SystemDesc,
-    ecs::{System, SystemData, World},
-};
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
 
 pub struct LoadingState {
-    /// Tracks loaded assets.
     progress_counter: ProgressCounter,
-    /// Handle to the player texture.
     scene: Option<Handle<GltfSceneAsset>>,
+    screamer: Option<SourceHandle>,
+    coming: Option<SourceHandle>,
 }
 
 impl SimpleState for LoadingState {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let loader = data.world.read_resource::<Loader>();
-        let scene = loader.load(
+
+        self.scene = Some(loader.load(
             "models/SalleMachine.glb",
             GltfSceneFormat::default(),
             &mut self.progress_counter,
             &data.world.read_resource::<AssetStorage<GltfSceneAsset>>(),
-        );
-        self.scene = Some(scene);
+        ));
+        self.screamer = Some(loader.load(
+            "sounds/screamer.mp3",
+            Mp3Format,
+            &mut self.progress_counter,
+            &data.world.read_resource::<AssetStorage<Source>>(),
+        ));
+        self.coming = Some(loader.load(
+            "sounds/coming.mp3",
+            Mp3Format,
+            &mut self.progress_counter,
+            &data.world.read_resource::<AssetStorage<Source>>(),
+        ));
     }
 
     fn update(&mut self, _data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
@@ -56,6 +66,8 @@ impl SimpleState for LoadingState {
                     "Expected `scene` to exist when \
                         `progress_counter` is complete.",
                 ),
+                screamer: self.screamer.take().expect("iléou le screamer.mp3 :("),
+                coming: self.coming.take().expect("iléou le coming.mp3 :c"),
             }))
         } else {
             Trans::None
@@ -65,6 +77,23 @@ impl SimpleState for LoadingState {
 
 struct GameState {
     scene: Handle<GltfSceneAsset>,
+    screamer: SourceHandle,
+    coming: SourceHandle,
+}
+
+#[derive(Default)]
+pub struct CodeFound(u8);
+
+#[derive(Default)]
+pub struct TimeToScreamer {
+    at: f64,
+    played: bool,
+}
+
+#[derive(Default)]
+pub struct Sounds {
+    screamer: Option<SourceHandle>,
+    coming: Option<SourceHandle>,
 }
 
 impl SimpleState for GameState {
@@ -78,6 +107,13 @@ impl SimpleState for GameState {
             .with(self.scene.clone())
             .with(transform)
             .build();
+
+        data.world.insert(CodeFound::default());
+        data.world.insert(TimeToScreamer::default());
+        data.world.insert(Sounds {
+            screamer: Some(self.screamer.clone()),
+            coming: Some(self.coming.clone()),
+        });
 
         initialize_camera(data.world);
         initialize_light(data.world);
@@ -160,6 +196,7 @@ fn main() -> amethyst::Result<()> {
             "rupture_movement",
             &[],
         )
+        .with(ScreamerSystem, "screamer", &[])
         .with_bundle(ArcBallControlBundle::<StringBindings>::new().with_sensitivity(0.1, 0.1))?
         .with_bundle(TransformBundle::new().with_dep(&["arc_ball_rotation"]))?
         .with_bundle(
@@ -174,13 +211,16 @@ fn main() -> amethyst::Result<()> {
                 )
                 .with_plugin(RenderShaded3D::default())
                 .with_plugin(RenderSkybox::default()),
-        )?;
+        )?
+        .with_bundle(AudioBundle::default())?;
 
     let mut game = Application::new(
         assets_dir,
         LoadingState {
             progress_counter: ProgressCounter::default(),
             scene: None,
+            screamer: None,
+            coming: None,
         },
         game_data,
     )?;
@@ -248,6 +288,59 @@ impl<'a, T: BindingTypes> System<'a> for RuptureMovementSystem<T> {
                 transform.set_translation_y(old.y);
 
                 println!("X: {}, Z: {}", current.x, current.z);
+            }
+        }
+    }
+}
+
+#[derive(Debug, SystemDesc)]
+#[system_desc(name(ScreamerSystemDesc))]
+pub struct ScreamerSystem;
+
+impl<'s> System<'s> for ScreamerSystem {
+    type SystemData = (
+        Read<'s, Time>,
+        Read<'s, AssetStorage<Source>>,
+        Read<'s, Sounds>,
+        Option<Read<'s, Output>>,
+        Read<'s, CodeFound>,
+        Write<'s, TimeToScreamer>,
+    );
+
+    fn run(&mut self, (time, storage, sound, output, found, mut since): Self::SystemData) {
+        if since.at == 0.0 {
+            since.at = time.absolute_time_seconds() + 15.0 + rand::random::<f64>() * 10.0;
+        }
+
+        if time.absolute_time_seconds() > since.at - (1.0 + (4.0 / (found.0 as f64 + 1.0)))
+            && !since.played
+        {
+            play(&storage, &sound.coming, &output, 0.65);
+            since.played = true;
+        }
+
+        if time.absolute_time_seconds() > since.at {
+            play(&storage, &sound.screamer, &output, 0.9);
+
+            since.played = false;
+            since.at = time.absolute_time_seconds()
+                + 5.0
+                + (10.0 / (found.0 as f64 + 1.0))
+                + rand::random::<f64>() * 10.0;
+        }
+    }
+}
+
+fn play<'s>(
+    storage: &Read<'s, AssetStorage<Source>>,
+    handle: &Option<SourceHandle>,
+    output: &Option<Read<'s, Output>>,
+    volume: f32,
+) {
+    if let Some(output) = output {
+        if let Some(handle) = handle {
+            if let Some(sound) = storage.get(handle) {
+                output.play_once(sound, volume);
             }
         }
     }
