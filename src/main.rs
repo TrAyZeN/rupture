@@ -8,28 +8,28 @@ use amethyst::input::{
     get_input_axis_simple, is_key_down, is_mouse_button_down, BindingTypes, InputBundle,
     InputHandler, StringBindings, VirtualKeyCode,
 };
-use amethyst::renderer::light::{DirectionalLight, Light};
+use amethyst::renderer::light::{Light, PointLight};
 use amethyst::renderer::palette::rgb::Rgb;
 use amethyst::renderer::Camera;
 use amethyst::utils::auto_fov::AutoFovSystem;
 use amethyst::winit::MouseButton;
 use amethyst::{
-    core::ecs::{Join, Read, ReadStorage, WriteStorage},
+    core::ecs::{Component, Join, NullStorage, Read, ReadStorage, WriteStorage},
     core::transform::TransformBundle,
     prelude::*,
     renderer::{
-        plugins::{RenderFlat3D, RenderSkybox, RenderToWindow},
+        plugins::{RenderShaded3D, RenderSkybox, RenderToWindow},
         types::DefaultBackend,
         RenderingBundle,
     },
     utils::application_root_dir,
 };
-use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
-
 use amethyst::{
     derive::SystemDesc,
     ecs::{System, SystemData, World},
 };
+use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
+
 pub struct LoadingState {
     /// Tracks loaded assets.
     progress_counter: ProgressCounter,
@@ -79,8 +79,8 @@ impl SimpleState for GameState {
             .with(transform)
             .build();
 
-        initialize_light(data.world);
         initialize_camera(data.world);
+        initialize_light(data.world);
     }
 
     fn handle_event(
@@ -103,20 +103,22 @@ impl SimpleState for GameState {
 }
 
 fn initialize_light(world: &mut World) {
-    let light: Light = DirectionalLight {
-        intensity: 100.0,
+    let light: Light = PointLight {
         color: Rgb::new(1.0, 1.0, 1.0),
-        ..DirectionalLight::default()
+        intensity: 2.0,
+        smoothness: 1.0,
+        ..PointLight::default()
     }
     .into();
 
-    /*let mut transform = Transform::default();
-    transform.set_translation_xyz(5.0, 5.0, 20.0);*/
+    let mut transform = Transform::default();
+    transform.set_translation_xyz(0.0, 1.5, 0.0);
 
     world
         .create_entity()
         .with(light)
-        // .with(transform)
+        .with(transform)
+        .with(FlyControlTag::default())
         .build();
 }
 
@@ -170,7 +172,7 @@ fn main() -> amethyst::Result<()> {
                     RenderToWindow::from_config_path(display_config_path)?
                         .with_clear([0.34, 0.36, 0.52, 1.0]),
                 )
-                .with_plugin(RenderFlat3D::default())
+                .with_plugin(RenderShaded3D::default())
                 .with_plugin(RenderSkybox::default()),
         )?;
 
