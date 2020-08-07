@@ -17,13 +17,14 @@ use amethyst::{
     audio::{output::Output, AudioBundle, Mp3Format, Source, SourceHandle},
     core::transform::TransformBundle,
     derive::SystemDesc,
-    ecs::{Join, Read, ReadStorage, System, SystemData, World, Write, WriteStorage},
+    ecs::{Entity, Join, Read, ReadStorage, System, SystemData, World, Write, WriteStorage},
     prelude::*,
     renderer::{
         plugins::{RenderShaded3D, RenderSkybox, RenderToWindow},
         types::DefaultBackend,
         RenderingBundle,
     },
+    ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiText, UiTransform},
     utils::application_root_dir,
 };
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
@@ -33,6 +34,7 @@ pub struct LoadingState {
     scene: Option<Handle<GltfSceneAsset>>,
     screamer: Option<SourceHandle>,
     coming: Option<SourceHandle>,
+    font: Option<FontHandle>,
 }
 
 impl SimpleState for LoadingState {
@@ -43,19 +45,25 @@ impl SimpleState for LoadingState {
             "models/SalleMachine.glb",
             GltfSceneFormat::default(),
             &mut self.progress_counter,
-            &data.world.read_resource::<AssetStorage<GltfSceneAsset>>(),
+            &data.world.read_resource(),
         ));
         self.screamer = Some(loader.load(
             "sounds/screamer.mp3",
             Mp3Format,
             &mut self.progress_counter,
-            &data.world.read_resource::<AssetStorage<Source>>(),
+            &data.world.read_resource(),
         ));
         self.coming = Some(loader.load(
             "sounds/coming.mp3",
             Mp3Format,
             &mut self.progress_counter,
-            &data.world.read_resource::<AssetStorage<Source>>(),
+            &data.world.read_resource(),
+        ));
+        self.font = Some(loader.load(
+            "fonts/crow.ttf",
+            TtfFormat,
+            &mut self.progress_counter,
+            &data.world.read_resource(),
         ));
     }
 
@@ -68,6 +76,7 @@ impl SimpleState for LoadingState {
                 ),
                 screamer: self.screamer.take().expect("iléou le screamer.mp3 :("),
                 coming: self.coming.take().expect("iléou le coming.mp3 :c"),
+                font: self.font.take().expect("iléou le crow.ttf D:"),
             }))
         } else {
             Trans::None
@@ -79,6 +88,13 @@ struct GameState {
     scene: Handle<GltfSceneAsset>,
     screamer: SourceHandle,
     coming: SourceHandle,
+    font: FontHandle,
+}
+
+#[derive(Default)]
+pub struct Texts {
+    hide: Option<Entity>,
+    code: Option<Entity>,
 }
 
 #[derive(Default)]
@@ -91,9 +107,19 @@ pub struct TimeToScreamer {
 }
 
 #[derive(Default)]
+pub struct PlayerLight(Option<Entity>);
+
+#[derive(Default)]
 pub struct Sounds {
     screamer: Option<SourceHandle>,
     coming: Option<SourceHandle>,
+}
+
+#[derive(Default)]
+pub struct PlayerHidden {
+    hidden: bool,
+    can_hide: bool,
+    pressed: bool,
 }
 
 impl SimpleState for GameState {
@@ -115,8 +141,57 @@ impl SimpleState for GameState {
             coming: Some(self.coming.clone()),
         });
 
+        let hide = data
+            .world
+            .create_entity()
+            .with(UiTransform::new(
+                "hide".to_string(),
+                Anchor::BottomRight,
+                Anchor::BottomRight,
+                -50.,
+                50.,
+                1.,
+                650.,
+                50.,
+            ))
+            .with(UiText::new(
+                self.font.clone(),
+                String::new(),
+                [1., 1., 1., 1.],
+                40.,
+            ))
+            .build();
+
+        let code = data
+            .world
+            .create_entity()
+            .with(UiTransform::new(
+                "code".to_string(),
+                Anchor::TopLeft,
+                Anchor::TopLeft,
+                10.,
+                -50.,
+                1.,
+                500.,
+                50.,
+            ))
+            .with(UiText::new(
+                self.font.clone(),
+                "Tests passes à 0%".to_string(),
+                [1., 1., 1., 1.],
+                60.,
+            ))
+            .build();
+
+        data.world.insert(Texts {
+            hide: Some(hide),
+            code: Some(code),
+        });
+
         initialize_camera(data.world);
-        initialize_light(data.world);
+
+        let entity = initialize_light(data.world);
+        data.world.insert(entity);
     }
 
     fn handle_event(
@@ -138,7 +213,7 @@ impl SimpleState for GameState {
     }
 }
 
-fn initialize_light(world: &mut World) {
+fn initialize_light(world: &mut World) -> PlayerLight {
     let light: Light = PointLight {
         color: Rgb::new(1.0, 1.0, 1.0),
         intensity: 2.0,
@@ -150,12 +225,14 @@ fn initialize_light(world: &mut World) {
     let mut transform = Transform::default();
     transform.set_translation_xyz(0.0, 1.5, 0.0);
 
-    world
+    let entity = world
         .create_entity()
         .with(light)
         .with(transform)
         .with(FlyControlTag::default())
         .build();
+
+    PlayerLight(Some(entity))
 }
 
 fn initialize_camera(world: &mut World) {
@@ -197,6 +274,7 @@ fn main() -> amethyst::Result<()> {
             &[],
         )
         .with(ScreamerSystem, "screamer", &[])
+        .with(HidingSystem, "hiding", &[])
         .with_bundle(ArcBallControlBundle::<StringBindings>::new().with_sensitivity(0.1, 0.1))?
         .with_bundle(TransformBundle::new().with_dep(&["arc_ball_rotation"]))?
         .with_bundle(
@@ -210,9 +288,11 @@ fn main() -> amethyst::Result<()> {
                         .with_clear([0.34, 0.36, 0.52, 1.0]),
                 )
                 .with_plugin(RenderShaded3D::default())
+                .with_plugin(RenderUi::default())
                 .with_plugin(RenderSkybox::default()),
         )?
-        .with_bundle(AudioBundle::default())?;
+        .with_bundle(AudioBundle::default())?
+        .with_bundle(UiBundle::<StringBindings>::new())?;
 
     let mut game = Application::new(
         assets_dir,
@@ -221,6 +301,7 @@ fn main() -> amethyst::Result<()> {
             scene: None,
             screamer: None,
             coming: None,
+            font: None,
         },
         game_data,
     )?;
@@ -264,11 +345,16 @@ impl<'a, T: BindingTypes> System<'a> for RuptureMovementSystem<T> {
         WriteStorage<'a, Transform>,
         Read<'a, InputHandler<T>>,
         ReadStorage<'a, FlyControlTag>,
+        Write<'a, PlayerHidden>,
     );
 
-    fn run(&mut self, (time, mut transform, input, tag): Self::SystemData) {
+    fn run(&mut self, (time, mut transform, input, tag, mut hide): Self::SystemData) {
         let x = get_input_axis_simple(&self.right_input_axis, &input);
         let z = get_input_axis_simple(&self.forward_input_axis, &input);
+
+        if hide.hidden {
+            return;
+        }
 
         if let Some(dir) = Unit::try_new(Vector3::new(x, 0.0, z), convert(1.0e-6)) {
             for (transform, _) in (&mut transform, &tag).join() {
@@ -284,6 +370,10 @@ impl<'a, T: BindingTypes> System<'a> for RuptureMovementSystem<T> {
                 if !is_in_bound(old.x, current.z) {
                     transform.set_translation_z(old.z);
                 }
+
+                let current = transform.translation().clone();
+                hide.can_hide = is_close_from_computer(current.x, current.z)
+                    || is_close_from_computer(current.x + 14.0, current.z);
 
                 transform.set_translation_y(old.y);
 
@@ -305,14 +395,15 @@ impl<'s> System<'s> for ScreamerSystem {
         Option<Read<'s, Output>>,
         Read<'s, CodeFound>,
         Write<'s, TimeToScreamer>,
+        Read<'s, PlayerHidden>,
     );
 
-    fn run(&mut self, (time, storage, sound, output, found, mut since): Self::SystemData) {
+    fn run(&mut self, (time, storage, sound, output, found, mut since, hidden): Self::SystemData) {
         if since.at == 0.0 {
             since.at = time.absolute_time_seconds() + 15.0 + rand::random::<f64>() * 10.0;
         }
 
-        if time.absolute_time_seconds() > since.at - (1.0 + (4.0 / (found.0 as f64 + 1.0)))
+        if time.absolute_time_seconds() > since.at - (1.0 + (3.0 / (found.0 as f64 + 1.0)))
             && !since.played
         {
             play(&storage, &sound.coming, &output, 0.65);
@@ -320,13 +411,66 @@ impl<'s> System<'s> for ScreamerSystem {
         }
 
         if time.absolute_time_seconds() > since.at {
-            play(&storage, &sound.screamer, &output, 0.9);
+            if !hidden.hidden {
+                play(&storage, &sound.screamer, &output, 0.9);
+            }
 
             since.played = false;
             since.at = time.absolute_time_seconds()
                 + 5.0
                 + (10.0 / (found.0 as f64 + 1.0))
                 + rand::random::<f64>() * 10.0;
+        }
+    }
+}
+
+#[derive(Debug, SystemDesc)]
+#[system_desc(name(HidingSystemDesc))]
+pub struct HidingSystem;
+
+impl<'s> System<'s> for HidingSystem {
+    type SystemData = (
+        Write<'s, PlayerHidden>,
+        WriteStorage<'s, UiText>,
+        Read<'s, Texts>,
+        Read<'s, InputHandler<StringBindings>>,
+        WriteStorage<'s, Light>,
+        Read<'s, PlayerLight>,
+    );
+
+    fn run(&mut self, (mut hidden, mut ui, texts, bindings, mut lights, light): Self::SystemData) {
+        if let Some(hide) = texts.hide {
+            if let Some(text) = ui.get_mut(hide) {
+                if hidden.hidden {
+                    text.text = "Rappuyez sur 'P' pour ne plus vous cacher".to_string();
+                } else if hidden.can_hide {
+                    text.text = "Appuyez sur 'P' pour vous cacher".to_string();
+                } else {
+                    text.text = String::new();
+                }
+            }
+        }
+
+        if let Some(pressed) = bindings.action_is_down("hide") {
+            if pressed && !hidden.pressed {
+                hidden.pressed = true;
+                hidden.hidden = !hidden.hidden;
+            }
+
+            if !pressed && hidden.pressed {
+                hidden.pressed = false;
+            }
+        }
+
+        if let Some(light) = light.0 {
+            if let Some(light) = lights.get_mut(light) {
+                match light {
+                    Light::Point(point) => {
+                        point.intensity = if hidden.hidden { 0.0 } else { 2.0 };
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 }
@@ -357,7 +501,11 @@ fn is_in_room(x: f32, z: f32) -> bool {
     (x > -2.35 && z > -3.35 && x < -1.55 && z < -2.65) // Porte droite
         || (x > -10.55 && z > -3.35 && x < -9.55 && z < -2.65) // Porte gauche 
         || (x > -12.75 && z > -7.0 && x < 0.55 && z < -3.35) // Entrée salle
-        || (x > -0.85 && z > -22.5 && x < 0.55 && z < -7.0) // Inter droit
+        || is_close_from_computer(x, z)
+}
+
+fn is_close_from_computer(x: f32, z: f32) -> bool {
+    (x > -0.85 && z > -22.5 && x < 0.55 && z < -7.0) // Inter droit
         || (x > -8.8 && z > -22.5 && x < -3.1 && z < -7.0) // Inter centre
         || (x > -12.75 && z > -22.5 && x < -11.25 && z < -7.0) // Inter gauche
 }
