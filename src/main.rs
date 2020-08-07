@@ -42,6 +42,30 @@ pub struct LoadingState {
     afit: Option<Handle<SpriteSheet>>,
 }
 
+impl LoadingState {
+    fn load_sprite_sheet(&mut self, data: &StateData<'_, GameData<'_, '_>>) -> Handle<SpriteSheet> {
+        let texture_handle = {
+            let loader = data.world.read_resource::<Loader>();
+            let texture_storage = data.world.read_resource::<AssetStorage<Texture>>();
+            loader.load(
+                "textures/afit.png",
+                ImageFormat::default(),
+                &mut self.progress_counter,
+                &texture_storage,
+            )
+        };
+
+        let loader = data.world.read_resource::<Loader>();
+        let sprite_sheet_store = data.world.read_resource::<AssetStorage<SpriteSheet>>();
+        loader.load(
+            "textures/afit_spritesheet.ron", // Here we load the associated ron file
+            SpriteSheetFormat(texture_handle),
+            &mut self.progress_counter,
+            &sprite_sheet_store,
+        )
+    }
+}
+
 impl SimpleState for LoadingState {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let loader = data.world.read_resource::<Loader>();
@@ -70,7 +94,7 @@ impl SimpleState for LoadingState {
             &mut self.progress_counter,
             &data.world.read_resource(),
         ));
-        self.afit = Some(load_sprite_sheet(data.world, &mut self.progress_counter));
+        self.afit = Some(self.load_sprite_sheet(&data));
     }
 
     fn update(&mut self, _data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
@@ -83,7 +107,10 @@ impl SimpleState for LoadingState {
                 screamer: self.screamer.take().expect("iléou le screamer.mp3 :("),
                 coming: self.coming.take().expect("iléou le coming.mp3 :c"),
                 font: self.font.take().expect("iléou le crow.ttf D:"),
-                afit: self.afit.take().expect("iléou le afit.png"),
+                afit: SpriteRender {
+                    sprite_sheet: self.afit.take().expect("iléou le afit.png"),
+                    sprite_number: 0
+                },
             }))
         } else {
             Trans::None
@@ -91,37 +118,12 @@ impl SimpleState for LoadingState {
     }
 }
 
-fn load_sprite_sheet(
-    world: &mut World,
-    progress_counter: &mut ProgressCounter,
-) -> Handle<SpriteSheet> {
-    let texture_handle = {
-        let loader = world.read_resource::<Loader>();
-        let texture_storage = world.read_resource::<AssetStorage<Texture>>();
-        loader.load(
-            "textures/afit.png",
-            ImageFormat::default(),
-            progress_counter,
-            &texture_storage,
-        )
-    };
-
-    let loader = world.read_resource::<Loader>();
-    let sprite_sheet_store = world.read_resource::<AssetStorage<SpriteSheet>>();
-    loader.load(
-        "textures/afit_spritesheet.ron", // Here we load the associated ron file
-        SpriteSheetFormat(texture_handle),
-        progress_counter,
-        &sprite_sheet_store,
-    )
-}
-
 struct GameState {
     scene: Handle<GltfSceneAsset>,
     screamer: SourceHandle,
     coming: SourceHandle,
     font: FontHandle,
-    afit: Handle<SpriteSheet>,
+    afit: SpriteRender,
 }
 
 #[derive(Default)]
@@ -173,8 +175,6 @@ impl SimpleState for GameState {
             screamer: Some(self.screamer.clone()),
             coming: Some(self.coming.clone()),
         });
-
-        let afit = data.world.create_entity().with(SpriteRender);
 
         let hide = data
             .world
