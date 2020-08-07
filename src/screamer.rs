@@ -3,12 +3,12 @@ use amethyst::{
     audio::{output::Output, Source},
     core::Time,
     derive::SystemDesc,
-    ecs::{Read, System, SystemData, Write},
+    ecs::{Read, System, SystemData, Write, WriteStorage},
+    ui::UiTransform,
 };
-use amethyst::core::ecs::WriteStorage;
-use amethyst::ui::UiTransform;
 
-use crate::{Afit, MAX_CODE, play, PlayerHidden, Screamer, Sounds, TimeToScreamer};
+use crate::ui::Reading;
+use crate::{play, Afit, PlayerHidden, Screamer, Sounds, TimeToScreamer, MAX_CODE};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(ScreamerSystemDesc))]
@@ -25,9 +25,17 @@ impl<'s> System<'s> for ScreamerSystem {
         Read<'s, Afit>,
         Write<'s, TimeToScreamer>,
         Read<'s, PlayerHidden>,
+        Read<'s, Reading>,
     );
 
-    fn run(&mut self, (time, storage, sound, screamer, mut ui, output, afit, mut since, hidden): Self::SystemData) {
+    fn run(
+        &mut self,
+        (time, storage, sound, screamer, mut ui, output, afit, mut since, hidden, reading): Self::SystemData,
+    ) {
+        if reading.0 {
+            return;
+        }
+
         if since.at == 0.0 {
             since.at = time.absolute_time_seconds() + 15.0 + rand::random::<f64>() * 10.0;
         }
@@ -40,13 +48,7 @@ impl<'s> System<'s> for ScreamerSystem {
         }
 
         if time.absolute_time_seconds() - since.last_displayed > 3.5 && since.display {
-            if let Some(bashar) = screamer.bashar {
-                if let Some(transform) = ui.get_mut(bashar) {
-                    transform.width = 0.;
-                    transform.height = 0.;
-                    since.display = false;
-                }
-            }
+            std::process::exit(0);
         }
 
         if time.absolute_time_seconds() > since.at {

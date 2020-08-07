@@ -1,36 +1,37 @@
 use amethyst::{
     animation::VertexSkinningBundle,
     assets::{AssetStorage, Handle, Loader, ProgressCounter},
-    audio::{AudioBundle, Mp3Format, output::Output, Source, SourceHandle},
+    audio::{output::Output, AudioBundle, Mp3Format, Source, SourceHandle},
     controls::{ArcBallControlBundle, FlyControlTag, HideCursor},
     core::{math::Vector3, Transform, TransformBundle},
     ecs::{Entity, Read, World},
-    input::{InputBundle, is_key_down, is_mouse_button_down, StringBindings, VirtualKeyCode},
+    input::{is_key_down, is_mouse_button_down, InputBundle, StringBindings, VirtualKeyCode},
     prelude::*,
     renderer::{
-        Camera,
-        ImageFormat,
         light::{Light, PointLight},
         palette::rgb::Rgb,
-        plugins::{RenderShaded3D, RenderSkybox, RenderToWindow}, RenderingBundle, SpriteRender, SpriteSheet, SpriteSheetFormat, Texture,
+        plugins::{RenderShaded3D, RenderSkybox, RenderToWindow},
         types::DefaultBackend,
+        Camera, ImageFormat, RenderingBundle, SpriteRender, SpriteSheet, SpriteSheetFormat,
+        Texture,
     },
-    ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiText, UiTransform},
+    ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiImage, UiTransform, UiText},
     utils::{application_root_dir, auto_fov::AutoFovSystem},
     winit::MouseButton,
 };
-use amethyst::ui::UiImage;
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
 
 mod hide;
 mod movement;
 mod screamer;
 mod space;
+mod ui;
 mod use_system;
 
 use hide::HidingSystem;
 use movement::RuptureMovementSystem;
 use screamer::ScreamerSystem;
+use ui::{Reading, TextSystem};
 use use_system::UseSystem;
 
 const MAX_CODE: u8 = 10;
@@ -144,6 +145,8 @@ struct GameState {
 }
 
 #[derive(Default)]
+pub struct CodeFound(u8);
+
 pub struct Texts {
     hide: Option<Entity>,
     _use: Option<Entity>,
@@ -158,7 +161,7 @@ pub struct Afit {
 
 #[derive(Default)]
 pub struct Screamer {
-    bashar: Option<Entity>
+    bashar: Option<Entity>,
 }
 
 #[derive(Default)]
@@ -189,16 +192,16 @@ impl SimpleState for GameState {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let mut transform = Transform::default();
         transform.set_scale(Vector3::new(2.0, 2.0, 2.0));
-        // Create the scene entity.
+
         data.world
             .create_entity()
-            // Use the scene handle as a component
             .with(self.scene.clone())
             .with(transform)
             .build();
 
         data.world.insert(Afit::default());
         data.world.insert(TimeToScreamer::default());
+        data.world.insert(Reading(true));
         data.world.insert(Sounds {
             screamer: Some(self.screamer.clone()),
             coming: Some(self.coming.clone()),
@@ -278,8 +281,8 @@ impl SimpleState for GameState {
             .create_entity()
             .with(UiTransform::new(
                 "bashar".to_string(),
-                Anchor::TopLeft,
-                Anchor::TopLeft,
+                Anchor::Middle,
+                Anchor::Middle,
                 0.,
                 0.,
                 0.,
@@ -294,6 +297,9 @@ impl SimpleState for GameState {
         });
 
         initialize_camera(data.world);
+
+        let texts = ui::create_texts(data.world, &self.font);
+        data.world.insert(texts);
 
         let entity = initialize_light(data.world);
         data.world.insert(entity);
@@ -380,6 +386,7 @@ fn main() -> amethyst::Result<()> {
         )
         .with(ScreamerSystem, "screamer", &[])
         .with(HidingSystem, "hiding", &[])
+        .with(TextSystem, "text", &[])
         .with(UseSystem, "use", &[])
         .with_bundle(ArcBallControlBundle::<StringBindings>::new().with_sensitivity(0.1, 0.1))?
         .with_bundle(TransformBundle::new().with_dep(&["arc_ball_rotation"]))?

@@ -9,7 +9,8 @@ use amethyst::{
     input::{get_input_axis_simple, InputHandler, StringBindings},
 };
 
-use crate::{PlayerHidden, space::*};
+use crate::ui::Reading;
+use crate::{space::*, PlayerHidden, TimeToScreamer};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(RuptureMovementSystemDesc))]
@@ -40,15 +41,20 @@ impl<'a> System<'a> for RuptureMovementSystem {
         Read<'a, InputHandler<StringBindings>>,
         ReadStorage<'a, FlyControlTag>,
         Write<'a, PlayerHidden>,
+        Read<'a, Reading>,
+        Read<'a, TimeToScreamer>,
     );
 
-    fn run(&mut self, (time, mut transform, input, tag, mut hide): Self::SystemData) {
-        let x = get_input_axis_simple(&self.right_input_axis, &input);
-        let z = get_input_axis_simple(&self.forward_input_axis, &input);
-
-        if hide.hidden {
+    fn run(
+        &mut self,
+        (time, mut transform, input, tag, mut hide, reading, since): Self::SystemData,
+    ) {
+        if reading.0 || hide.hidden || since.last_displayed != 0.0 {
             return;
         }
+
+        let x = get_input_axis_simple(&self.right_input_axis, &input);
+        let z = get_input_axis_simple(&self.forward_input_axis, &input);
 
         if let Some(dir) = Unit::try_new(Vector3::new(x, 0.0, z), convert(1.0e-6)) {
             for (transform, _) in (&mut transform, &tag).join() {

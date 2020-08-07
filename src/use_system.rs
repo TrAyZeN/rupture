@@ -1,8 +1,8 @@
 use amethyst::{
-    derive::SystemDesc,
-    core::Transform,
     controls::FlyControlTag,
     ecs::{System, SystemData, Read, ReadStorage, Write, WriteStorage, Join},
+    core::Transform,
+    derive::SystemDesc,
     input::{InputHandler, StringBindings},
     ui::UiText,
 };

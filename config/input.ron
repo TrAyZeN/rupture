@@ -2,11 +2,11 @@
     axes: {
         "move_x": Emulated(
             pos: Key(D),
-            neg: Key(A),
+            neg: Key(Q),
         ),
         "move_z": Emulated(
             pos: Key(S),
-            neg: Key(W),
+            neg: Key(Z),
         ),
     },
     actions: {
