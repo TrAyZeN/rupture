@@ -1,3 +1,4 @@
+use amethyst::ui::UiImage;
 use amethyst::{
     animation::VertexSkinningBundle,
     assets::{AssetStorage, Handle, Loader, ProgressCounter},
@@ -15,11 +16,10 @@ use amethyst::{
         Camera, ImageFormat, RenderingBundle, SpriteRender, SpriteSheet, SpriteSheetFormat,
         Texture,
     },
-    ui::{FontHandle, RenderUi, TtfFormat, UiBundle},
+    ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiTransform},
     utils::{application_root_dir, auto_fov::AutoFovSystem},
     winit::MouseButton,
 };
-
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
 
 mod hide;
@@ -27,13 +27,16 @@ mod movement;
 mod screamer;
 mod space;
 mod ui;
+mod use_system;
 
 use hide::HidingSystem;
 use movement::RuptureMovementSystem;
 use screamer::ScreamerSystem;
 use ui::{Reading, TextSystem};
+use use_system::UseSystem;
 
 const MAX_CODE: u8 = 10;
+pub const COMPUTER_NUMBER: i32 = 32;
 
 pub struct LoadingState {
     progress_counter: ProgressCounter,
@@ -42,6 +45,7 @@ pub struct LoadingState {
     coming: Option<SourceHandle>,
     font: Option<FontHandle>,
     afit: Option<Handle<SpriteSheet>>,
+    bashar: Option<Handle<Texture>>,
 }
 
 impl LoadingState {
@@ -97,8 +101,13 @@ impl SimpleState for LoadingState {
             &mut self.progress_counter,
             &data.world.read_resource(),
         ));
-
         self.afit = Some(self.load_sprite_sheet(&data.world));
+        self.bashar = Some(loader.load(
+            "textures/bashar.jpeg",
+            ImageFormat::default(),
+            &mut self.progress_counter,
+            &data.world.read_resource(),
+        ));
     }
 
     fn update(&mut self, _data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
@@ -115,6 +124,9 @@ impl SimpleState for LoadingState {
                     sprite_sheet: self.afit.take().expect("iléou le afit.png"),
                     sprite_number: 0,
                 },
+                bashar: UiImage::Texture(self.bashar.take().expect("iléou bashar.jpeg")),
+                score: 0.0,
+                unlocked_computers: Vec::new(),
             }))
         } else {
             Trans::None
@@ -128,15 +140,36 @@ struct GameState {
     coming: SourceHandle,
     font: FontHandle,
     afit: SpriteRender,
+    bashar: UiImage,
+    score: f64, // test success rate
+    unlocked_computers: Vec<i32>,
 }
 
 #[derive(Default)]
 pub struct CodeFound(u8);
 
+pub struct Texts {
+    hide: Option<Entity>,
+    code: Option<Entity>,
+}
+
+#[derive(Default)]
+pub struct Afit {
+    code_found: u8,
+    unlocked_computers: Vec<i32>,
+}
+
+#[derive(Default)]
+pub struct Screamer {
+    bashar: Option<Entity>,
+}
+
 #[derive(Default)]
 pub struct TimeToScreamer {
     at: f64,
     played: bool,
+    last_displayed: f64,
+    display: bool,
 }
 
 #[derive(Default)]
@@ -166,12 +199,32 @@ impl SimpleState for GameState {
             .with(transform)
             .build();
 
-        data.world.insert(CodeFound::default());
+        data.world.insert(Afit::default());
         data.world.insert(TimeToScreamer::default());
         data.world.insert(Reading(true));
         data.world.insert(Sounds {
             screamer: Some(self.screamer.clone()),
             coming: Some(self.coming.clone()),
+        });
+
+        let bashar = data
+            .world
+            .create_entity()
+            .with(UiTransform::new(
+                "bashar".to_string(),
+                Anchor::TopLeft,
+                Anchor::TopLeft,
+                0.,
+                0.,
+                0.,
+                0.,
+                0.,
+            ))
+            .with(self.bashar.clone())
+            .build();
+
+        data.world.insert(Screamer {
+            bashar: Some(bashar),
         });
 
         initialize_camera(data.world);
@@ -265,6 +318,7 @@ fn main() -> amethyst::Result<()> {
         .with(ScreamerSystem, "screamer", &[])
         .with(HidingSystem, "hiding", &[])
         .with(TextSystem, "text", &[])
+        .with(UseSystem, "use", &[])
         .with_bundle(ArcBallControlBundle::<StringBindings>::new().with_sensitivity(0.1, 0.1))?
         .with_bundle(TransformBundle::new().with_dep(&["arc_ball_rotation"]))?
         .with_bundle(
@@ -293,6 +347,7 @@ fn main() -> amethyst::Result<()> {
             coming: None,
             font: None,
             afit: None,
+            bashar: None,
         },
         game_data,
     )?;

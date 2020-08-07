@@ -3,11 +3,12 @@ use amethyst::{
     audio::{output::Output, Source},
     core::Time,
     derive::SystemDesc,
-    ecs::{Read, System, SystemData, Write},
+    ecs::{Read, System, SystemData, Write, WriteStorage},
+    ui::UiTransform,
 };
 
 use crate::ui::Reading;
-use crate::{play, CodeFound, PlayerHidden, Sounds, TimeToScreamer, MAX_CODE};
+use crate::{play, Afit, PlayerHidden, Screamer, Sounds, TimeToScreamer, MAX_CODE};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(ScreamerSystemDesc))]
@@ -18,8 +19,10 @@ impl<'s> System<'s> for ScreamerSystem {
         Read<'s, Time>,
         Read<'s, AssetStorage<Source>>,
         Read<'s, Sounds>,
+        Read<'s, Screamer>,
+        WriteStorage<'s, UiTransform>,
         Option<Read<'s, Output>>,
-        Read<'s, CodeFound>,
+        Read<'s, Afit>,
         Write<'s, TimeToScreamer>,
         Read<'s, PlayerHidden>,
         Read<'s, Reading>,
@@ -27,7 +30,7 @@ impl<'s> System<'s> for ScreamerSystem {
 
     fn run(
         &mut self,
-        (time, storage, sound, output, found, mut since, hidden, reading): Self::SystemData,
+        (time, storage, sound, screamer, mut ui, output, afit, mut since, hidden, reading): Self::SystemData,
     ) {
         if reading.0 {
             return;
@@ -37,22 +40,40 @@ impl<'s> System<'s> for ScreamerSystem {
             since.at = time.absolute_time_seconds() + 15.0 + rand::random::<f64>() * 10.0;
         }
 
-        if time.absolute_time_seconds() > since.at - (1.0 + (3.0 / (found.0 as f64 + 1.0)))
+        if time.absolute_time_seconds() > since.at - (1.0 + (3.0 / (afit.code_found as f64 + 1.0)))
             && !since.played
         {
             play(&storage, &sound.coming, &output, 0.65);
             since.played = true;
         }
 
+        if time.absolute_time_seconds() - since.last_displayed > 3.5 && since.display {
+            if let Some(bashar) = screamer.bashar {
+                if let Some(transform) = ui.get_mut(bashar) {
+                    transform.width = 0.;
+                    transform.height = 0.;
+                    since.display = false;
+                }
+            }
+        }
+
         if time.absolute_time_seconds() > since.at {
             if !hidden.hidden {
-                play(&storage, &sound.screamer, &output, 0.9);
+                if let Some(bashar) = screamer.bashar {
+                    if let Some(transform) = ui.get_mut(bashar) {
+                        transform.width = 1024.;
+                        transform.height = 768.;
+                        since.last_displayed = time.absolute_time_seconds();
+                        since.display = true;
+                        play(&storage, &sound.screamer, &output, 0.9);
+                    }
+                }
             }
 
             since.played = false;
             since.at = time.absolute_time_seconds()
                 + 5.0
-                + (MAX_CODE as f64 / (found.0 as f64 + 1.0))
+                + (MAX_CODE as f64 / (afit.code_found as f64 + 1.0))
                 + rand::random::<f64>() * 10.0;
         }
     }
