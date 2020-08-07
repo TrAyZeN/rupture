@@ -6,7 +6,7 @@ use amethyst::{
     ecs::{Read, System, SystemData, Write},
 };
 
-use crate::{play, CodeFound, PlayerHidden, Sounds, TimeToScreamer, MAX_CODE};
+use crate::{play, Afit, PlayerHidden, Sounds, TimeToScreamer, MAX_CODE};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(ScreamerSystemDesc))]
@@ -18,17 +18,17 @@ impl<'s> System<'s> for ScreamerSystem {
         Read<'s, AssetStorage<Source>>,
         Read<'s, Sounds>,
         Option<Read<'s, Output>>,
-        Read<'s, CodeFound>,
+        Read<'s, Afit>,
         Write<'s, TimeToScreamer>,
         Read<'s, PlayerHidden>,
     );
 
-    fn run(&mut self, (time, storage, sound, output, found, mut since, hidden): Self::SystemData) {
+    fn run(&mut self, (time, storage, sound, output, afit, mut since, hidden): Self::SystemData) {
         if since.at == 0.0 {
             since.at = time.absolute_time_seconds() + 15.0 + rand::random::<f64>() * 10.0;
         }
 
-        if time.absolute_time_seconds() > since.at - (1.0 + (3.0 / (found.0 as f64 + 1.0)))
+        if time.absolute_time_seconds() > since.at - (1.0 + (3.0 / (afit.code_found as f64 + 1.0)))
             && !since.played
         {
             play(&storage, &sound.coming, &output, 0.65);
@@ -43,7 +43,7 @@ impl<'s> System<'s> for ScreamerSystem {
             since.played = false;
             since.at = time.absolute_time_seconds()
                 + 5.0
-                + (MAX_CODE as f64 / (found.0 as f64 + 1.0))
+                + (MAX_CODE as f64 / (afit.code_found as f64 + 1.0))
                 + rand::random::<f64>() * 10.0;
         }
     }

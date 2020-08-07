@@ -22,17 +22,19 @@ use amethyst::{
 
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystemDesc};
 
-const COMPUTER_NUMBER: i32 = 32;
 mod hide;
 mod movement;
 mod screamer;
 mod space;
+mod use_system;
 
 use hide::HidingSystem;
 use movement::RuptureMovementSystem;
 use screamer::ScreamerSystem;
+use use_system::UseSystem;
 
 const MAX_CODE: u8 = 10;
+pub const COMPUTER_NUMBER: i32 = 32;
 
 pub struct LoadingState {
     progress_counter: ProgressCounter,
@@ -114,8 +116,6 @@ impl SimpleState for LoadingState {
                     sprite_sheet: self.afit.take().expect("iléou le afit.png"),
                     sprite_number: 0,
                 },
-                score: 0.0,
-                unlocked_computers: Vec::new(),
             }))
         } else {
             Trans::None
@@ -129,8 +129,6 @@ struct GameState {
     coming: SourceHandle,
     font: FontHandle,
     afit: SpriteRender,
-    score: f64, // test success rate
-    unlocked_computers: Vec<i32>,
 }
 
 #[derive(Default)]
@@ -140,7 +138,10 @@ pub struct Texts {
 }
 
 #[derive(Default)]
-pub struct CodeFound(u8);
+pub struct Afit {
+    code_found: u8,
+    unlocked_computers: Vec<i32>,
+}
 
 #[derive(Default)]
 pub struct TimeToScreamer {
@@ -176,7 +177,7 @@ impl SimpleState for GameState {
             .with(transform)
             .build();
 
-        data.world.insert(CodeFound::default());
+        data.world.insert(Afit::default());
         data.world.insert(TimeToScreamer::default());
         data.world.insert(Sounds {
             screamer: Some(self.screamer.clone()),
@@ -317,6 +318,7 @@ fn main() -> amethyst::Result<()> {
         )
         .with(ScreamerSystem, "screamer", &[])
         .with(HidingSystem, "hiding", &[])
+        .with(UseSystem, "use", &[])
         .with_bundle(ArcBallControlBundle::<StringBindings>::new().with_sensitivity(0.1, 0.1))?
         .with_bundle(TransformBundle::new().with_dep(&["arc_ball_rotation"]))?
         .with_bundle(
@@ -366,43 +368,4 @@ fn play<'s>(
             }
         }
     }
-}
-
-// Oui c'est dégueulasse, mais est-ce qu'il y a vraiment une autre solution xd
-fn is_in_bound(x: f32, z: f32) -> bool {
-    (x > -25.0 && z > -2.65 && x < 0.65 && z < 0.65) // Couloir
-        || is_in_room(x, z) // Salle droite
-        || is_in_room(x + 14.0, z) // Salle gauche
-}
-
-fn is_in_room(x: f32, z: f32) -> bool {
-    (x > -2.35 && z > -3.35 && x < -1.55 && z < -2.65) // Porte droite
-        || (x > -10.55 && z > -3.35 && x < -9.55 && z < -2.65) // Porte gauche
-        || (x > -12.75 && z > -7.0 && x < 0.55 && z < -3.35) // Entrée salle
-        || (x > -0.85 && z > -22.5 && x < 0.55 && z < -7.0) // Inter droit
-        || (x > -8.8 && z > -22.5 && x < -3.1 && z < -7.0) // Inter centre
-        || (x > -12.75 && z > -22.5 && x < -11.25 && z < -7.0) // Inter gauche
-}
-
-// On stack les trucs degueux ici
-const COMPUTER_ROW_X: [f32; 4] = [
-    -0.5,
-    -8.2,
-    -14.3,
-    -22.384,
-];
-
-fn is_able_to_use_computer(player_transform: &Transform, computer_id: i32) -> bool {
-    let trigger_x = {
-        let mut row_x = COMPUTER_ROW_X[computer_id as usize / 8];
-        if computer_id % 8 >= 4 {
-            row_x -= 2.5;
-        }
-        row_x
-    };
-    let trigger_z = -7.38 - (computer_id % 4) as f32 * 4.1;
-
-    let pos = player_transform.translation();
-    pos.x >= trigger_x-0.35 && pos.z >= trigger_z-1.8
-        && pos.x <= trigger_x && pos.z <= trigger_z
 }
