@@ -39,7 +39,7 @@ impl<'s> System<'s> for ScreamerSystem {
             since.played = true;
         }
 
-        if time.absolute_time_seconds() - since.last_displayed > 3. && since.display {
+        if time.absolute_time_seconds() - since.last_displayed > 3.5 && since.display {
             if let Some(bashar) = screamer.bashar {
                 if let Some(transform) = ui.get_mut(bashar) {
                     transform.width = 0.;
@@ -51,13 +51,13 @@ impl<'s> System<'s> for ScreamerSystem {
 
         if time.absolute_time_seconds() > since.at {
             if !hidden.hidden {
-                play(&storage, &sound.screamer, &output, 0.9);
                 if let Some(bashar) = screamer.bashar {
                     if let Some(transform) = ui.get_mut(bashar) {
                         transform.width = 1024.;
                         transform.height = 768.;
                         since.last_displayed = time.absolute_time_seconds();
                         since.display = true;
+                        play(&storage, &sound.screamer, &output, 0.9);
                     }
                 }
             }
