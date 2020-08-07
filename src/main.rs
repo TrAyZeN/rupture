@@ -124,8 +124,6 @@ impl SimpleState for LoadingState {
                     sprite_number: 0,
                 },
                 bashar: UiImage::Texture(self.bashar.take().expect("iléou bashar.jpeg")),
-                score: 0.0,
-                unlocked_computers: Vec::new(),
             }))
         } else {
             Trans::None
@@ -140,12 +138,7 @@ struct GameState {
     font: FontHandle,
     afit: SpriteRender,
     bashar: UiImage,
-    score: f64, // test success rate
-    unlocked_computers: Vec<i32>,
 }
-
-#[derive(Default)]
-pub struct CodeFound(u8);
 
 #[derive(Default)]
 pub struct Texts {
