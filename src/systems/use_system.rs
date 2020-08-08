@@ -1,13 +1,13 @@
 use amethyst::{
     controls::FlyControlTag,
-    ecs::{System, SystemData, Read, ReadStorage, Write, WriteStorage, Join},
     core::Transform,
     derive::SystemDesc,
+    ecs::{Join, Read, ReadStorage, System, SystemData, Write, WriteStorage},
     input::{InputHandler, StringBindings},
     ui::UiText,
 };
 
-use crate::{Afit, COMPUTER_NUMBER, space::*, ui::Texts};
+use crate::{space::*, states::game::Afit, ui::Texts, COMPUTER_NUMBER};
 
 #[derive(SystemDesc)]
 pub struct UseSystem;
@@ -38,7 +38,9 @@ impl<'s> System<'s> for UseSystem {
             if let Some(pressed) = input.action_is_down("use") {
                 if pressed {
                     for i in 0..COMPUTER_NUMBER {
-                        if afit.unlocked_computers.contains(&i) && is_able_to_use_computer(&transform, i) {
+                        if afit.unlocked_computers.contains(&i)
+                            && is_able_to_use_computer(&transform, i)
+                        {
                             afit.unlocked_computers.remove(i as usize);
                             afit.code_found += 1;
                             break;

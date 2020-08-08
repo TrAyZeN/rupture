@@ -21,12 +21,7 @@ pub fn is_close_from_computer(x: f32, z: f32) -> bool {
 }
 
 // On stack les trucs degueux ici
-const COMPUTER_ROW_X: [f32; 4] = [
-    -0.5,
-    -8.2,
-    -14.3,
-    -22.384,
-];
+const COMPUTER_ROW_X: [f32; 4] = [-0.5, -8.2, -14.3, -22.384];
 
 pub fn is_able_to_use_computer(player_transform: &Transform, computer_id: i32) -> bool {
     let trigger_x = {
@@ -39,6 +34,8 @@ pub fn is_able_to_use_computer(player_transform: &Transform, computer_id: i32) -
     let trigger_z = -7.38 - (computer_id % 4) as f32 * 4.1;
 
     let pos = player_transform.translation();
-    pos.x >= trigger_x-0.35 && pos.z >= trigger_z-1.8
-        && pos.x <= trigger_x && pos.z <= trigger_z
+    pos.x >= trigger_x - 0.35
+        && pos.z >= trigger_z - 1.8
+        && pos.x <= trigger_x
+        && pos.z <= trigger_z
 }

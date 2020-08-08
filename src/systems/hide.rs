@@ -6,7 +6,10 @@ use amethyst::{
     ui::UiText,
 };
 
-use crate::{ui::Texts, PlayerHidden, PlayerLight};
+use crate::{
+    states::game::{PlayerHidden, PlayerLight},
+    ui::Texts,
+};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(HidingSystemDesc))]

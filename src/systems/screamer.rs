@@ -8,7 +8,11 @@ use amethyst::{
 };
 
 use crate::ui::Reading;
-use crate::{play, Afit, PlayerHidden, Screamer, Sounds, TimeToScreamer, MAX_CODE};
+use crate::{
+    play,
+    states::game::{Afit, PlayerHidden, Screamer, Sounds, TimeToScreamer},
+    MAX_CODE,
+};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(ScreamerSystemDesc))]

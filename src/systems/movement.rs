@@ -10,7 +10,10 @@ use amethyst::{
 };
 
 use crate::ui::Reading;
-use crate::{space::*, PlayerHidden, TimeToScreamer};
+use crate::{
+    space::*,
+    states::game::{PlayerHidden, TimeToScreamer},
+};
 
 #[derive(Debug, SystemDesc)]
 #[system_desc(name(RuptureMovementSystemDesc))]
@@ -76,8 +79,6 @@ impl<'a> System<'a> for RuptureMovementSystem {
                     || is_close_from_computer(current.x + 14.0, current.z);
 
                 transform.set_translation_y(old.y);
-
-                // println!("X: {}, Z: {}", current.x, current.z);
             }
         }
     }
