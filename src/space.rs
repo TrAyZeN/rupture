@@ -23,9 +23,9 @@ pub fn is_close_from_computer(x: f32, z: f32) -> bool {
 // On stack les trucs degueux ici
 const COMPUTER_ROW_X: [f32; 4] = [-0.5, -8.2, -14.3, -22.384];
 
-pub fn is_able_to_use_computer(player_transform: &Transform, computer_id: i32) -> bool {
+pub fn is_able_to_use_computer(player_transform: &Transform, computer_id: usize) -> bool {
     let trigger_x = {
-        let mut row_x = COMPUTER_ROW_X[computer_id as usize / 8];
+        let mut row_x = COMPUTER_ROW_X[computer_id / 8];
         if computer_id % 8 >= 4 {
             row_x -= 2.5;
         }

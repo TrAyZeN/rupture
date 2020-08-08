@@ -7,9 +7,14 @@ use amethyst::{
     ui::UiText,
 };
 
-use crate::{space::*, states::game::Afit, ui::Texts, COMPUTER_NUMBER};
+use crate::{
+    space::*,
+    states::game::{Afit, PlayerHidden, UnlockedComputers, MAX_CODE},
+    ui::Texts,
+};
 
 #[derive(SystemDesc)]
+#[system_desc(name(UseSystemDesc))]
 pub struct UseSystem;
 
 impl<'s> System<'s> for UseSystem {
@@ -19,14 +24,19 @@ impl<'s> System<'s> for UseSystem {
         Read<'s, Texts>,
         Read<'s, InputHandler<StringBindings>>,
         Write<'s, Afit>,
+        Write<'s, UnlockedComputers>,
+        Read<'s, PlayerHidden>,
         ReadStorage<'s, FlyControlTag>,
     );
 
-    fn run(&mut self, (transforms, mut ui, texts, input, mut afit, tags): Self::SystemData) {
+    fn run(
+        &mut self,
+        (transforms, mut ui, texts, input, mut afit, mut uc, hidden, tags): Self::SystemData,
+    ) {
         for (transform, _) in (&transforms, &tags).join() {
+            let pos = transform.translation();
             if let Some(_use) = texts._use {
                 if let Some(text) = ui.get_mut(_use) {
-                    let pos = transform.translation();
                     if is_close_from_computer(pos.x, pos.z) {
                         text.text = "Appuyez sur 'J' pour recuperer le code".to_string();
                     } else {
@@ -35,15 +45,26 @@ impl<'s> System<'s> for UseSystem {
                 }
             }
 
-            if let Some(pressed) = input.action_is_down("use") {
-                if pressed {
-                    for i in 0..COMPUTER_NUMBER {
-                        if afit.unlocked_computers.contains(&i)
-                            && is_able_to_use_computer(&transform, i)
-                        {
-                            afit.unlocked_computers.remove(i as usize);
-                            afit.code_found += 1;
-                            break;
+            if is_close_from_computer(pos.x, pos.z) {
+                if let Some(pressed) = input.action_is_down("use") {
+                    if !hidden.hidden && pressed {
+                        for i in 0..uc.unlocked_computers.len() {
+                            if is_able_to_use_computer(&transform, uc.unlocked_computers[i]) {
+                                uc.unlocked_computers.remove(i);
+                                afit.code_found += 1;
+
+                                if let Some(code) = texts.code {
+                                    if let Some(text) = ui.get_mut(code) {
+                                        text.text = format!(
+                                            "Tests passes a {}%",
+                                            (afit.code_found.min(MAX_CODE) as f32 / MAX_CODE as f32
+                                                * 100.0)
+                                                as i32
+                                        );
+                                    }
+                                }
+                                break;
+                            }
                         }
                     }
                 }

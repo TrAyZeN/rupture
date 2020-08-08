@@ -1,3 +1,4 @@
+pub mod code;
 pub mod hide;
 pub mod movement;
 pub mod screamer;

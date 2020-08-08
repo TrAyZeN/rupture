@@ -15,8 +15,11 @@ use amethyst::{
     winit::MouseButton,
 };
 use amethyst_gltf::GltfSceneAsset;
+use std::time::Duration;
 
 use crate::ui::{self, *};
+
+pub const MAX_CODE: u8 = 10;
 
 pub struct GameState {
     pub scene: Handle<GltfSceneAsset>,
@@ -30,7 +33,12 @@ pub struct GameState {
 #[derive(Default)]
 pub struct Afit {
     pub code_found: u8,
-    pub unlocked_computers: Vec<i32>,
+}
+
+#[derive(Default)]
+pub struct UnlockedComputers {
+    pub unlocked_computers: Vec<usize>,
+    pub last_unlock_time: Duration,
 }
 
 #[derive(Default)]
@@ -74,6 +82,7 @@ impl SimpleState for GameState {
             .build();
 
         data.world.insert(Afit::default());
+        data.world.insert(UnlockedComputers::default());
         data.world.insert(TimeToScreamer::default());
         data.world.insert(Reading(true));
         data.world.insert(Sounds {

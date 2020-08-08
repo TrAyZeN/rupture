@@ -17,22 +17,17 @@ use amethyst::{
 };
 use amethyst_gltf::GltfSceneLoaderSystemDesc;
 
+mod space;
 mod states;
 mod systems;
 mod ui;
-mod space;
 
 use states::loading::LoadingState;
 use systems::{
-    hide::HidingSystem,
-    movement::RuptureMovementSystem,
-    screamer::ScreamerSystem,
-    use_system::UseSystem,
+    code::CodeSystem, hide::HidingSystem, movement::RuptureMovementSystem,
+    screamer::ScreamerSystem, use_system::UseSystem,
 };
 use ui::TextSystem;
-
-const MAX_CODE: u8 = 10;
-pub const COMPUTER_NUMBER: i32 = 32;
 
 fn main() -> amethyst::Result<()> {
     amethyst::start_logger(Default::default());
@@ -60,6 +55,7 @@ fn main() -> amethyst::Result<()> {
             "rupture_movement",
             &[],
         )
+        .with(CodeSystem, "code", &[])
         .with(ScreamerSystem, "screamer", &[])
         .with(HidingSystem, "hiding", &[])
         .with(TextSystem, "text", &[])
