@@ -10,6 +10,7 @@ use amethyst::{
 #[derive(Default)]
 pub struct Texts {
     pub hide: Option<Entity>,
+    pub _use: Option<Entity>,
     pub code: Option<Entity>,
     pub menu: Option<Entity>,
 }
@@ -28,6 +29,26 @@ pub fn create_texts(world: &mut World, font: &FontHandle) -> Texts {
             50.,
             1.,
             650.,
+            50.,
+        ))
+        .with(UiText::new(
+            font.clone(),
+            String::new(),
+            [1., 1., 1., 1.],
+            40.,
+        ))
+        .build();
+
+    let _use = world
+        .create_entity()
+        .with(UiTransform::new(
+            "_use".to_string(),
+            Anchor::BottomRight,
+            Anchor::BottomRight,
+            -50.,
+            100.,
+            1.,
+            700.,
             50.,
         ))
         .with(UiText::new(
@@ -68,7 +89,7 @@ pub fn create_texts(world: &mut World, font: &FontHandle) -> Texts {
         Mais attention, Bashar rode et il ne ne vous laissera pas faire !\n\
         Alors si vous entendez un bruit etrange, cachez-vous vite sous une table,\n\
         et vous ressortirez peut-etre vivant d'ici !\n\n\
-        
+
         Cliquez n'importe ou pour commencer"
             .to_string(),
         [1., 1., 1., 1.],
@@ -93,6 +114,7 @@ pub fn create_texts(world: &mut World, font: &FontHandle) -> Texts {
 
     Texts {
         hide: Some(hide),
+        _use: Some(_use),
         code: Some(code),
         menu: Some(menu),
     }

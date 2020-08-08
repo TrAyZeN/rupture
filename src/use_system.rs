@@ -7,7 +7,7 @@ use amethyst::{
     ui::UiText,
 };
 
-use crate::{Afit, COMPUTER_NUMBER, space::*, Texts};
+use crate::{Afit, COMPUTER_NUMBER, space::*, ui::Texts};
 
 #[derive(SystemDesc)]
 pub struct UseSystem;
@@ -28,7 +28,7 @@ impl<'s> System<'s> for UseSystem {
                 if let Some(text) = ui.get_mut(_use) {
                     let pos = transform.translation();
                     if is_close_from_computer(pos.x, pos.z) {
-                        text.text = "Appuyez sur 'E' ou 'F' pour récupérer le code".to_string();
+                        text.text = "Appuyez sur 'J' pour recuperer le code".to_string();
                     } else {
                         text.text = String::new();
                     }

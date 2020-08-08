@@ -15,7 +15,7 @@ use amethyst::{
         Camera, ImageFormat, RenderingBundle, SpriteRender, SpriteSheet, SpriteSheetFormat,
         Texture,
     },
-    ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiImage, UiTransform, UiText},
+    ui::{Anchor, FontHandle, RenderUi, TtfFormat, UiBundle, UiImage, UiTransform},
     utils::{application_root_dir, auto_fov::AutoFovSystem},
     winit::MouseButton,
 };
@@ -141,13 +141,6 @@ struct GameState {
 }
 
 #[derive(Default)]
-pub struct Texts {
-    hide: Option<Entity>,
-    _use: Option<Entity>,
-    code: Option<Entity>,
-}
-
-#[derive(Default)]
 pub struct Afit {
     code_found: u8,
     unlocked_computers: Vec<i32>,
@@ -199,75 +192,6 @@ impl SimpleState for GameState {
         data.world.insert(Sounds {
             screamer: Some(self.screamer.clone()),
             coming: Some(self.coming.clone()),
-        });
-
-        let hide = data
-            .world
-            .create_entity()
-            .with(UiTransform::new(
-                "hide".to_string(),
-                Anchor::BottomRight,
-                Anchor::BottomRight,
-                -50.,
-                50.,
-                1.,
-                650.,
-                50.,
-            ))
-            .with(UiText::new(
-                self.font.clone(),
-                String::new(),
-                [1., 1., 1., 1.],
-                40.,
-            ))
-            .build();
-
-        let _use = data
-            .world
-            .create_entity()
-            .with(UiTransform::new(
-                "_use".to_string(),
-                Anchor::BottomRight,
-                Anchor::BottomRight,
-                -50.,
-                100.,
-                1.,
-                750.,
-                50.,
-            ))
-            .with(UiText::new(
-                self.font.clone(),
-                String::new(),
-                [1., 1., 1., 1.],
-                40.,
-            ))
-            .build();
-
-        let code = data
-            .world
-            .create_entity()
-            .with(UiTransform::new(
-                "code".to_string(),
-                Anchor::TopLeft,
-                Anchor::TopLeft,
-                10.,
-                -50.,
-                1.,
-                500.,
-                50.,
-            ))
-            .with(UiText::new(
-                self.font.clone(),
-                "Tests passes a 0%".to_string(),
-                [1., 1., 1., 1.],
-                60.,
-            ))
-            .build();
-
-        data.world.insert(Texts {
-            hide: Some(hide),
-            _use: Some(_use),
-            code: Some(code),
         });
 
         let bashar = data

@@ -2,15 +2,15 @@
     axes: {
         "move_x": Emulated(
             pos: Key(D),
-            neg: Key(Q),
+            neg: Key(A),
         ),
         "move_z": Emulated(
             pos: Key(S),
-            neg: Key(Z),
+            neg: Key(W),
         ),
     },
     actions: {
         "hide": [[Key(P)]],
-        "use": [[Key(E), Key(F)]],
+        "use": [[Key(J)]],
     },
 )
