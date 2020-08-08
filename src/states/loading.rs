@@ -15,6 +15,7 @@ pub struct LoadingState {
     pub scene: Option<Handle<GltfSceneAsset>>,
     pub screamer: Option<SourceHandle>,
     pub coming: Option<SourceHandle>,
+    pub boot: Option<SourceHandle>,
     pub font: Option<FontHandle>,
     pub afit: Option<Handle<SpriteSheet>>,
     pub bashar: Option<Handle<Texture>>,
@@ -67,6 +68,12 @@ impl SimpleState for LoadingState {
             &mut self.progress_counter,
             &data.world.read_resource(),
         ));
+        self.boot = Some(loader.load(
+            "sounds/boot.mp3",
+            Mp3Format,
+            &mut self.progress_counter,
+            &data.world.read_resource(),
+        ));
         self.font = Some(loader.load(
             "fonts/crow.ttf",
             TtfFormat,
@@ -91,6 +98,7 @@ impl SimpleState for LoadingState {
                 ),
                 screamer: self.screamer.take().expect("iléou le screamer.mp3 :("),
                 coming: self.coming.take().expect("iléou le coming.mp3 :c"),
+                boot: self.boot.take().expect("iléou le boot.mp3 :<"),
                 font: self.font.take().expect("iléou le crow.ttf D:"),
                 afit: SpriteRender {
                     sprite_sheet: self.afit.take().expect("iléou le afit.png"),

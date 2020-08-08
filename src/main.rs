@@ -24,7 +24,7 @@ mod ui;
 
 use states::loading::LoadingState;
 use systems::{
-    code::CodeSystem, hide::HidingSystem, movement::RuptureMovementSystem,
+    computer::ComputerSystem, hide::HidingSystem, movement::RuptureMovementSystem,
     screamer::ScreamerSystem, use_system::UseSystem,
 };
 use ui::TextSystem;
@@ -55,7 +55,7 @@ fn main() -> amethyst::Result<()> {
             "rupture_movement",
             &[],
         )
-        .with(CodeSystem, "code", &[])
+        .with(ComputerSystem, "computer", &[])
         .with(ScreamerSystem, "screamer", &[])
         .with(HidingSystem, "hiding", &[])
         .with(TextSystem, "text", &[])
@@ -86,6 +86,7 @@ fn main() -> amethyst::Result<()> {
             scene: None,
             screamer: None,
             coming: None,
+            boot: None,
             font: None,
             afit: None,
             bashar: None,

@@ -1,4 +1,4 @@
-pub mod code;
+pub mod computer;
 pub mod hide;
 pub mod movement;
 pub mod screamer;

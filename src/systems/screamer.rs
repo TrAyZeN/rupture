@@ -7,10 +7,10 @@ use amethyst::{
     ui::UiTransform,
 };
 
-use crate::ui::Reading;
 use crate::{
     play,
     states::game::{Afit, PlayerHidden, Screamer, Sounds, TimeToScreamer, MAX_CODE},
+    ui::Reading,
 };
 
 #[derive(Debug, SystemDesc)]

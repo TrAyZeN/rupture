@@ -25,6 +25,7 @@ pub struct GameState {
     pub scene: Handle<GltfSceneAsset>,
     pub screamer: SourceHandle,
     pub coming: SourceHandle,
+    pub boot: SourceHandle,
     pub font: FontHandle,
     pub afit: SpriteRender,
     pub bashar: UiImage,
@@ -61,6 +62,7 @@ pub struct PlayerLight(pub Option<Entity>);
 pub struct Sounds {
     pub screamer: Option<SourceHandle>,
     pub coming: Option<SourceHandle>,
+    pub boot: Option<SourceHandle>,
 }
 
 #[derive(Default)]
@@ -88,6 +90,7 @@ impl SimpleState for GameState {
         data.world.insert(Sounds {
             screamer: Some(self.screamer.clone()),
             coming: Some(self.coming.clone()),
+            boot: Some(self.boot.clone()),
         });
 
         let bashar = data
