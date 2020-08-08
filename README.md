@@ -1,6 +1,6 @@
 # rupture - AFIT.EXE
 
-Yeah hollidays rupture we are going to do something else than watching youtube videos all day
+A game about stealing code, AFIT and screamers.
 
 ## Requirements
 
@@ -17,3 +17,9 @@ $ cargo build --release
 ```bash
 $ cargo run --release
 ```
+
+## Made by
+
+- [Adrien Navratil (Litarvan)](https://github.com/litarvan)
+- [Adamaq01](https://github.com/adamaq01)
+- [TrAyZeN](https://github.com/trayzen)
